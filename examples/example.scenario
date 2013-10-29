@@ -1,0 +1,44 @@
+# Example cluster scenario
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs apache wget
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize apache config
+##
+nodes=all
+....
+cat << END >>  /etc/httpd/conf/httpd.conf
+<Location /server-status>
+    SetHandler server-status
+    Order deny,allow
+    Deny from all
+    Allow from 127.0.0.1
+</Location>
+END
+
+cat << END >> /var/www/html/index.html
+<html>
+<body>My Test Site</body>
+</html>
+END
+....
+
+##
+# Make the cluster storage resources
+##
+nodes=$PHD_ENV_nodes1
+....
+pcs resource create web_daemon apache
+....
+

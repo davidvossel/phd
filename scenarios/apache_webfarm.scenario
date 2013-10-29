@@ -1,0 +1,100 @@
+# Example cluster scenario
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+shared_storage=1
+packages=pacemaker corosync pcs apache wget lvm2
+cluster_init=1
+storage_init=1
+
+##############################
+# Scenario Variable Defaults #
+##############################
+= LOCAL_VARIABLES =
+volume_size=512m
+
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize apache config
+##
+nodes=all
+....
+cat << END >>  /etc/httpd/conf/httpd.conf
+<Location /server-status>
+    SetHandler server-status
+    Order deny,allow
+    Deny from all
+    Allow from 127.0.0.1
+</Location>
+END
+....
+
+##
+# Set LVM locking type and lvm.conf
+##
+nodes=all
+....
+lvmconf --disable-cluster
+....
+
+##
+# Create logical volume for web data
+##
+nodes=$PHD_ENV_node1
+....
+pvcreate $PHD_ENV_shared_storage1
+vgcreate cluster_vg /dev/vdb
+lvcreate -L${AF_volume_size}M -n cluster_lv cluster_vg
+mkfs.ext4 /dev/cluster_vg/cluster_lv
+
+mount /dev/cluster_vg/cluster_lv /var/www/
+mkdir /var/www/html
+mkdir /var/www/cgi-bin
+mkdir /var/www/error
+restorecon -R /var/www
+
+cat << END >> /var/www/html/index.html
+<html>
+<body>My Test Site</body>
+</html>
+END
+
+umount /var/www
+lvchange -an cluster_vg/cluster_lv
+....
+
+##
+# Set LVM locking type and lvm.conf
+##
+nodes=all
+....
+volume_list=$(echo -n '"' && vgs --noheadings -o vg_name | tr -d ' ' | tr '\n' ',' | sed -e "s/,/\",\"/g" | sed -e "s/\",\"$//g" && echo '"')
+sed -i.bak 's/^volume_list = .*/volume_list = [ $(volume_list) ]/g' /etc/lvm/lvm.conf
+sed -i.bak 's/.* volume_list = .*/volume_list = [ $(volume_list) ]/g' /etc/lvm/lvm.conf
+sed -i.bak 's/.*#volume_list = .*/volume_list = [ $(volume_list) ]/g' /etc/lvm/lvm.conf
+
+dracut -H -f /boot/initramfs-$(uname -r).img $(uname -r)
+....
+
+##
+# Make the cluster storage resources
+##
+nodes=$PHD_ENV_nodes1
+....
+tmpfile=mktemp
+pcs cluster cib $tmpfile
+
+pcs -f $tmpfile resource create web_vg LVM volgroupname=cluster_vg exclusive=true
+pcs -f $tmpfile resource create web_data Filesystem device="/dev/cluster_vg/cluster_lv" directory="var/www" fstype="ext4" on monitor interval=30s on-fail=fence
+pcs -f $tmpfile resource create web_daemon apache
+pcs -f $tmpfile group add web_group web_vg web_data web_daemon
+....
+

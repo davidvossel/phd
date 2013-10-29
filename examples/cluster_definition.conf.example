@@ -1,0 +1,40 @@
+# Cluster definition variables
+
+
+#==#==# Cluster Resource Variables
+
+##
+# Cluster nodes available.  If blank, corosync node list will be used.
+# nodes=pcmk_node1 pcmk_node2
+##
+
+## 
+# Available floating ip addressesto use in scenarios
+# floating_ips=192.168.122.200
+##
+
+##
+# shared storage devices available to all nodes
+##
+# shared_storage=/dev/vdb /dev/vdc
+
+#==#==# Cluster Configuration Method Variables
+
+##
+# Configuration Transports supported.
+# All scenarios will require some form of remote transport to be available.
+# Set the prefered method here. This will default to ssh otherwise.
+#
+# ssh = all nodes can talk to each other via ssh without requiring passwords
+# pcsd = all nodes are capable of communicating via pcsd
+#
+transports=ssh
+##
+
+##
+# Some scenarios will require use of puppet for configuration management.
+# When puppet is configured in the cluster, list the host or floating ip
+# associated with the puppet master instance.
+#
+# puppet_master=192.168.122.220
+##
