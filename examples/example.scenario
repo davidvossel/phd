@@ -42,7 +42,7 @@ END
 ....
 
 ##
-# Make the cluster storage resources
+# Make the cluster apache and floating ip resources
 ##
 nodes=$PHD_ENV_nodes1
 ....
