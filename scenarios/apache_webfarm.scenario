@@ -25,7 +25,7 @@ volume_size=512m
 ##
 # Initialize apache config
 ##
-nodes=all
+target=all
 ....
 cat << END >>  /etc/httpd/conf/httpd.conf
 <Location /server-status>
@@ -40,7 +40,7 @@ END
 ##
 # Set LVM locking type and lvm.conf
 ##
-nodes=all
+target=all
 ....
 lvmconf --disable-cluster
 ....
@@ -48,7 +48,7 @@ lvmconf --disable-cluster
 ##
 # Create logical volume for web data
 ##
-nodes=$PHD_ENV_node1
+target=$PHD_ENV_node1
 ....
 pvcreate $PHD_ENV_shared_storage1
 vgcreate cluster_vg /dev/vdb
@@ -74,7 +74,7 @@ lvchange -an cluster_vg/cluster_lv
 ##
 # Set LVM locking type and lvm.conf
 ##
-nodes=all
+target=all
 ....
 volume_list=$(echo -n '"' && vgs --noheadings -o vg_name | tr -d ' ' | tr '\n' ',' | sed -e "s/,/\",\"/g" | sed -e "s/\",\"$//g" && echo '"')
 sed -i.bak 's/^volume_list = .*/volume_list = [ $(volume_list) ]/g' /etc/lvm/lvm.conf
@@ -87,7 +87,7 @@ dracut -H -f /boot/initramfs-$(uname -r).img $(uname -r)
 ##
 # Make the cluster storage resources
 ##
-nodes=$PHD_ENV_nodes1
+target=$PHD_ENV_target1
 ....
 tmpfile=mktemp
 pcs cluster cib $tmpfile

@@ -17,7 +17,7 @@ floating_ips=1
 ##
 # Initialize apache config
 ##
-nodes=all
+target=all
 ....
 grep "^<Location /server-status" /etc/httpd/conf/httpd.conf
 if [ "$?" -ne "0" ]; then
@@ -44,7 +44,7 @@ END
 ##
 # Make the cluster apache and floating ip resources
 ##
-nodes=$PHD_ENV_nodes1
+target=$PHD_ENV_nodes1
 ....
 pcs property set stonith-enabled=false
 pcs property set no-quorum-policy=ignore

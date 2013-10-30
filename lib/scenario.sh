@@ -144,7 +144,7 @@ scenario_script_exec()
 			break
 		fi
 
-		nodes=$(eval echo "\$${SENV_PREFIX}_nodes${script_num}")
+		nodes=$(eval echo "\$${SENV_PREFIX}_target${script_num}")
 		if [ -z "$nodes" ]; then
 			nodes=$(defintion_nodes)
 		fi
