@@ -7,6 +7,7 @@
 nodes=2
 packages=pacemaker corosync pcs httpd wget
 cluster_init=1
+floating_ips=1
 
 ######################
 # Deployment Scripts #
@@ -31,7 +32,7 @@ END
 fi
 
 if [ -e "/var/www/html/index.html" ]; then
-	return 0
+	exit 0
 fi
 cat << END >> /var/www/html/index.html
 <html>
@@ -47,6 +48,8 @@ nodes=$PHD_ENV_nodes1
 ....
 pcs property set stonith-enabled=false
 pcs property set no-quorum-policy=ignore
-pcs resource create WebSite ocf:heartbeat:apache  configfile=/etc/httpd/conf/httpd.conf statusurl="http://localhost/server-status" op monitor interval=1min
+pcs resource create web-site ocf:heartbeat:apache  configfile=/etc/httpd/conf/httpd.conf statusurl="http://localhost/server-status" op monitor interval=1min
+pcs resource create web-ip ocf:heartbeat:IPaddr2 ip=$(eval echo "\\${PHD_ENV_floating_ips1}")
+pcs resource group add web-group web-site web-ip
 ....
 

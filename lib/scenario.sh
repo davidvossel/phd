@@ -19,6 +19,18 @@ scenario_clean()
 	phd_clear_vars "$SENV_PREFIX"
 }
 
+scenario_script_add_env()
+{
+	local script=$1
+	local tmp
+
+	while read tmp; do
+		local key=$(echo $tmp | awk -F= '{print $1}')
+		local value=$(echo $tmp | awk -F= '{print $2}')
+		echo "export $key=\"${value}\"" >> $script
+	done < <(print_definition)
+}
+
 scenario_unpack()
 {
 	local section=""
@@ -60,6 +72,7 @@ scenario_unpack()
 				cur_script=${TMP_DIR}/${SCRIPT_PREFIX}${script_num}
 				export "${SCRIPT_PREFIX}_${script_num}=${cur_script}"
 				touch ${cur_script}
+				scenario_script_add_env "$cur_script"
 				chmod 755 ${cur_script}
 			else
 				writing_script=0
