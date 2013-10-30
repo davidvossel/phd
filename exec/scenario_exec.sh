@@ -7,6 +7,9 @@ if [ -z "$PHDCONST_ROOT" ]; then
 		PHDCONST_ROOT=$(pwd)
 	fi
 fi
+
+. ${PHDCONST_ROOT}/lib/transport_ssh.sh
+. ${PHDCONST_ROOT}/lib/utils.sh
 . ${PHDCONST_ROOT}/lib/scenario.sh
 . ${PHDCONST_ROOT}/lib/definition.sh
 

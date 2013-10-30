@@ -43,7 +43,7 @@ scenario_unpack()
 
 		case $section in
 		$SEC_REQ)
-			export "${SREQ_PREFIX}_$cleaned"
+			export "${SREQ_PREFIX}_$line"
 			continue ;;
 		$SEC_LOCAL)
 			export "${SENV_PREFIX}_$cleaned"
@@ -56,7 +56,10 @@ scenario_unpack()
 		if [ "$cleaned" = "...." ]; then
 			if [ "$writing_script" -eq 0 ]; then
 				writing_script=1
-				export "${SCRIPT_PREFIX}_${script_num}=${TMP_DIR}/${SCRIPT_PREFIX}${script_num}"
+				cur_script=${TMP_DIR}/${SCRIPT_PREFIX}${script_num}
+				export "${SCRIPT_PREFIX}_${script_num}=${cur_script}"
+				touch ${cur_script}
+				chmod 755 ${cur_script}
 			else
 				writing_script=0
 				script_num=$(($script_num + 1))
@@ -66,7 +69,7 @@ scenario_unpack()
 
 		# If writing, append to latest script file
 		if [ "$writing_script" -eq 1 ]; then
-			echo "$line" >> ${TMP_DIR}/${SCRIPT_PREFIX}${script_num}
+			echo "$line" >> ${cur_script}
 		else
 			local key=$(echo $cleaned | awk -F= '{print $1}')
 			local value=$(echo $cleaned | awk -F= '{print $2}')
@@ -87,7 +90,22 @@ print_scenario()
 	return 0
 }
 
-scenario_exec()
+scenario_package_install()
+{
+	local packages=$(eval echo "\$${SREQ_PREFIX}_packages")
+	local nodes=$(definition_nodes)
+
+	if [ -z "$packages" ]; then
+		return 0
+	fi
+
+	phd_log LOG_NOTICE "Installing packages \"$packages\" on nodes \"$nodes\""
+	phd_cmd_exec "yum install -y $packages" "$nodes"
+
+	return 0
+}
+
+scenario_script_exec()
 {
 	local script_num=0
 	local script=""
@@ -102,15 +120,21 @@ scenario_exec()
 
 		nodes=$(eval echo "\$${SENV_PREFIX}_nodes${script_num}")
 		if [ -z "$nodes" ]; then
-			nodes=$(eval echo "\$${PHDENV_PREFIX}_nodes")
+			nodes=$(defintion_nodes)
 		fi
 		if [ "$nodes" = "all" ]; then
-			nodes=$(eval echo "\$${PHDENV_PREFIX}_nodes")
+			nodes=$(definition_nodes)
 		fi
 
 		phd_log LOG_NOTICE "executing $script on nodes \"$nodes\""
-
+		phd_script_exec $script "$nodes"
 	done
 
 	return 0
+}
+
+scenario_exec()
+{
+	scenario_package_install
+	scenario_script_exec
 }

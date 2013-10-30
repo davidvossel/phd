@@ -35,6 +35,11 @@ definition_unpack()
 	return 0
 }
 
+definition_nodes()
+{
+	eval echo "\$${PHDENV_PREFIX}_nodes"
+}
+
 print_definition()
 {
 	printenv | grep -e "$PHDENV_PREFIX"

@@ -5,7 +5,7 @@
 #################################
 = REQUIREMENTS =
 nodes=2
-packages=pacemaker corosync pcs apache wget
+packages=pacemaker corosync pcs httpd wget
 cluster_init=1
 
 ######################
@@ -18,7 +18,9 @@ cluster_init=1
 ##
 nodes=all
 ....
-cat << END >>  /etc/httpd/conf/httpd.conf
+grep "^<Location /server-status" /etc/httpd/conf/httpd.conf
+if [ "$?" -ne "0" ]; then
+	cat << END >>  /etc/httpd/conf/httpd.conf
 <Location /server-status>
     SetHandler server-status
     Order deny,allow
@@ -26,7 +28,11 @@ cat << END >>  /etc/httpd/conf/httpd.conf
     Allow from 127.0.0.1
 </Location>
 END
+fi
 
+if [ -e "/var/www/html/index.html" ]; then
+	return 0
+fi
 cat << END >> /var/www/html/index.html
 <html>
 <body>My Test Site</body>
@@ -39,6 +45,6 @@ END
 ##
 nodes=$PHD_ENV_nodes1
 ....
-pcs resource create web_daemon apache
+pcs resource create WebSite ocf:heartbeat:apache  configfile=/etc/httpd/conf/httpd.conf statusurl="http://localhost/server-status" op monitor interval=1min
 ....
 

@@ -1,4 +1,6 @@
 #!/bin/bash
+. ${PHDCONST_ROOT}/lib/transport_ssh.sh
+
 LOG_ERR="error"
 LOG_NOTICE="notice"
 LOG_INFO="info"
@@ -37,9 +39,20 @@ phd_log()
 	echo "$1: $2"
 }
 
+phd_cmd_exec()
+{
+	local cmd=$1
+	local nodes=$2
+
+	# TODO - support multiple transports
+	phd_ssh_cmd_exec "$cmd" "$nodes"
+}
+
 phd_script_exec()
 {
 	local script=$1
-	local node=$2
+	local nodes=$2
 
+	# TODO - support multiple transports
+	phd_ssh_script_exec $script "$nodes"
 }

@@ -6,7 +6,7 @@
 = REQUIREMENTS =
 nodes=2
 shared_storage=1
-packages=pacemaker corosync pcs apache wget lvm2
+packages=pacemaker corosync pcs httpd wget lvm2
 cluster_init=1
 storage_init=1
 
