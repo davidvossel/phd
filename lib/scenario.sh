@@ -1,6 +1,7 @@
 #!/bin/bash
 
 . ${PHDCONST_ROOT}/lib/utils.sh
+. ${PHDCONST_ROOT}/lib/pacemaker.sh
 
 SENV_PREFIX="PHD_SENV"
 SREQ_PREFIX="PHD_SREQ"
@@ -105,6 +106,18 @@ scenario_package_install()
 	return 0
 }
 
+scenario_cluster_init()
+{
+	local cluster_init=$(eval echo "\$${SREQ_PREFIX}_cluster_init")
+
+	if [ "$cluster_init" -eq "1" ]; then
+		pacemaker_cluster_stop
+		pacemaker_cluster_clean
+		pacemaker_cluster_init
+		pacemaker_cluster_start
+	fi
+}
+
 scenario_script_exec()
 {
 	local script_num=0
@@ -136,5 +149,6 @@ scenario_script_exec()
 scenario_exec()
 {
 	scenario_package_install
+	scenario_cluster_init
 	scenario_script_exec
 }

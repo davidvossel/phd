@@ -45,6 +45,8 @@ END
 ##
 nodes=$PHD_ENV_nodes1
 ....
+pcs property set stonith-enabled=false
+pcs property set no-quorum-policy=ignore
 pcs resource create WebSite ocf:heartbeat:apache  configfile=/etc/httpd/conf/httpd.conf statusurl="http://localhost/server-status" op monitor interval=1min
 ....
 

@@ -40,6 +40,11 @@ definition_nodes()
 	eval echo "\$${PHDENV_PREFIX}_nodes"
 }
 
+definition_node()
+{
+	eval echo "\$${PHDENV_PREFIX}_nodes${1}"
+}
+
 print_definition()
 {
 	printenv | grep -e "$PHDENV_PREFIX"
