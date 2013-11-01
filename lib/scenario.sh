@@ -107,14 +107,31 @@ print_scenario()
 scenario_package_install()
 {
 	local packages=$(eval echo "\$${SREQ_PREFIX}_packages")
-	local nodes=$(definition_nodes)
+	local package
+	local node
 
 	if [ -z "$packages" ]; then
 		return 0
 	fi
 
-	phd_log LOG_NOTICE "Installing packages \"$packages\" on nodes \"$nodes\""
-	phd_cmd_exec "yum install -y $packages" "$nodes"
+	for node in $(definition_nodes); do
+		phd_log LOG_DEBUG "Installing packages \"$packages\" on node \"$node\""
+		phd_cmd_exec "yum install -y $packages" "$node"
+		if [ $? -ne 0 ]; then
+			phd_log LOG_ERR "Could not install required packages on node \"$node\""
+			exit 1
+		fi
+
+		for package in $(echo $packages); do
+			phd_cmd_exec "yum list installed | grep $package > /dev/null 2>&1" "$node"
+			if [ $? -ne 0 ]; then
+				phd_log LOG_ERR "Could not install required package \"$package\" on node \"$node\""
+				exit 1
+			fi
+		done
+
+
+	done
 
 	return 0
 }
