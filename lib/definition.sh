@@ -45,6 +45,19 @@ definition_node()
 	eval echo "\$${PHDENV_PREFIX}_nodes${1}"
 }
 
+definition_meets_requirement()
+{
+	local key=$1
+	local val=$2
+	local exists=$(eval echo "\$${PHDENV_PREFIX}_$key$val")
+
+	if [ -z "$exists" ]; then
+		phd_log LOG_ERR "Cluster definition is missing scenario requirement \"$key=$val\""
+		return 1
+	fi
+	return 0
+}
+
 print_definition()
 {
 	printenv | grep -e "$PHDENV_PREFIX"

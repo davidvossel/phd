@@ -177,8 +177,35 @@ scenario_script_exec()
 	return 0
 }
 
+scenario_verify()
+{
+	local res=0
+	while read line; do
+		local key=$(echo $line | awk -F= '{print $1}' | sed "s/${SREQ_PREFIX}_//g")
+		local value=$(echo $line | awk -F= '{print $2}')
+
+		case $key in
+		cluster_init|cluster_destroy|packages)
+			continue ;;
+		*) : ;;
+		esac
+
+		definition_meets_requirement $key $value
+		if [ $? -ne 0 ]; then
+			res=1
+		fi
+	done < <(printenv | grep "$SREQ_PREFIX")
+
+	if [ $res -ne 0 ]; then
+		phd_log LOG_ERR "Cluster defintion does not meet all of the scenarios requirements"
+		exit 1
+	fi
+
+}
+
 scenario_exec()
 {
+	scenario_verify
 	scenario_package_install
 	scenario_cluster_destroy
 	scenario_cluster_init
