@@ -2,6 +2,7 @@
 . ${PHDCONST_ROOT}/lib/transport_ssh.sh
 
 LOG_ERR="error"
+LOG_ERROR="error"
 LOG_NOTICE="notice"
 LOG_INFO="info"
 LOG_DEBUG="debug"
@@ -55,4 +56,16 @@ phd_script_exec()
 
 	# TODO - support multiple transports
 	phd_ssh_script_exec $script "$nodes"
+}
+
+phd_exit_failure()
+{
+	local reason=$1
+
+	if [ -z "$reason" ]; then
+		reason="scenario failure"
+	fi
+
+	phd_log LOG_ERR "Exiting: $reason"
+	exit 1
 }

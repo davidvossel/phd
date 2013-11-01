@@ -118,15 +118,13 @@ scenario_package_install()
 		phd_log LOG_DEBUG "Installing packages \"$packages\" on node \"$node\""
 		phd_cmd_exec "yum install -y $packages" "$node"
 		if [ $? -ne 0 ]; then
-			phd_log LOG_ERR "Could not install required packages on node \"$node\""
-			exit 1
+			php_exit_failure "Could not install required packages on node \"$node\""
 		fi
 
 		for package in $(echo $packages); do
 			phd_cmd_exec "yum list installed | grep $package > /dev/null 2>&1" "$node"
 			if [ $? -ne 0 ]; then
-				phd_log LOG_ERR "Could not install required package \"$package\" on node \"$node\""
-				exit 1
+				phd_exit_failure "Could not install required package \"$package\" on node \"$node\""
 			fi
 		done
 
@@ -214,8 +212,7 @@ scenario_verify()
 	done < <(printenv | grep "$SREQ_PREFIX")
 
 	if [ $res -ne 0 ]; then
-		phd_log LOG_ERR "Cluster defintion does not meet all of the scenarios requirements"
-		exit 1
+		phd_exit_failure "Cluster defintion does not meet all of the scenarios requirements"
 	fi
 
 }

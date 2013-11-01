@@ -27,7 +27,6 @@ pacemaker_cluster_stop()
 		# always cleanup processes
 		pacemaker_kill_processes $node
 	done
-
 }
 
 pacemaker_cluster_start()
@@ -38,8 +37,7 @@ pacemaker_cluster_start()
 	for node in $(echo $nodes); do
 		phd_cmd_exec "pcs cluster start" "$node"
 		if [ "$?" -ne 0 ]; then
-			phd_log LOG_ERR "Could not start pacemaker on node $node"
-			exit 1
+			phd_exit_failure "Could not start pacemaker on node $node"
 		fi
 	done
 
@@ -67,7 +65,6 @@ pacemaker_cluster_init()
 
 	phd_cmd_exec "pcs cluster setup --local phd-cluster $nodes" "$nodes"
 	if [ "$?" -ne 0 ]; then
-		phd_log LOG_ERR "Could not setup corosync config for pacemaker cluster"
-		exit 1
+		phd_exit_failure "Could not setup corosync config for pacemaker cluster"
 	fi
 }
