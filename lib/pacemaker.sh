@@ -1,6 +1,16 @@
 #!/bin/bash
 . ${PHDCONST_ROOT}/lib/utils.sh
 
+
+pacemaker_kill_processes()
+{
+	local node=$1
+
+	phd_log LOG_DEBUG "Killing processes on $node"
+
+	phd_cmd_exec "killall -q -9 corosync aisexec heartbeat pacemakerd pacemaker-remoted ccm stonithd ha_logd lrmd crmd pengine attrd pingd mgmtd cib fenced dlm_controld gfs_controld" "$node"
+}
+
 pacemaker_cluster_stop()
 {
 	local nodes=$(definition_nodes)
@@ -8,11 +18,14 @@ pacemaker_cluster_stop()
 
 	for node in $(echo $nodes); do
 		phd_cmd_exec "pcs cluster stop" "$node"
-		if [ "$?" -ne 0 ]; then
-			phd_log LOG_ERR "Could not stop pacemaker on node $node"
-			exit 1
+		if [ "$?" -eq 0 ]; then
+			phd_cmd_exec "service corosync stop" "$node"
+		else
+			phd_log LOG_ERR "Could not gracefully stop pacemaker on node $node"
+			phd_log LOG_DEBUG "Force stopping $node"
 		fi
-		phd_cmd_exec "service corosync stop" "$node"
+		# always cleanup processes
+		pacemaker_kill_processes $node
 	done
 
 }

@@ -119,9 +119,27 @@ scenario_package_install()
 	return 0
 }
 
+scenario_cluster_destroy()
+{
+	local cluster_destroy=$(eval echo "\$${SREQ_PREFIX}_cluster_destroy")
+
+	if [ -z "$cluster_destroy" ]; then
+		return
+	fi
+
+	if [ "$cluster_destroy" -eq "1" ]; then
+		pacemaker_cluster_stop
+		pacemaker_cluster_clean
+	fi
+}
+
 scenario_cluster_init()
 {
 	local cluster_init=$(eval echo "\$${SREQ_PREFIX}_cluster_init")
+
+	if [ -z "$cluster_init" ]; then
+		return
+	fi
 
 	if [ "$cluster_init" -eq "1" ]; then
 		pacemaker_cluster_stop
@@ -162,6 +180,7 @@ scenario_script_exec()
 scenario_exec()
 {
 	scenario_package_install
+	scenario_cluster_destroy
 	scenario_cluster_init
 	scenario_script_exec
 }

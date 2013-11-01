@@ -13,8 +13,8 @@ phd_ssh_script_exec()
 		phd_log LOG_DEBUG "executing script \"$script\" on node \"$node\""		
 		ssh -l root $node mkdir -p $dir
 		scp $script $node:$script
-		ssh -l root $node chmod 755 $script
-		ssh -l root $node $script
+		ssh -l root $node "chmod 755 $script"
+		ssh -l root $node "$script"
 	done
 }
 
@@ -26,7 +26,7 @@ phd_ssh_cmd_exec()
 
 	for node in $(echo $nodes); do
 		phd_log LOG_DEBUG "executing cmd \"$cmd\" on node \"$node\""		
-		ssh -l root $node $cmd
+		ssh -l root $node "$cmd"
 	done
 }
 

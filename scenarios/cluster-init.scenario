@@ -1,0 +1,10 @@
+# Clear and initialize/re-initialize a cluster
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=1
+packages=pacemaker corosync pcs
+cluster_init=1
+
