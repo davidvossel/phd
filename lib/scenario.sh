@@ -38,6 +38,18 @@ scenario_script_add_env()
 	done < <(print_definition)
 }
 
+scenario_install_nodes()
+{
+	local nodes=$(definition_nodes)
+	local install_local=$(eval echo "\$${SREQ_PREFIX}_install_local")
+
+	if [ "$install_local" -eq 1 ]; then
+		echo "$nodes $HOSTNAME" | sed 's/\s/\n/g' | sort | uniq -u | tr '\n' ' '
+	else 
+		echo "$nodes"
+	fi
+}
+
 scenario_unpack()
 {
 	local section=""
@@ -117,7 +129,7 @@ scenario_custom_package_install()
 	local packages=""
 	local rpms=""
 	local entry=""
-	local nodes=$(definition_nodes)
+	local nodes=$(scenario_install_nodes)
 	local node
 
 	if [ -z "$package_dir" ]; then
@@ -171,7 +183,7 @@ scenario_package_install()
 		return 0
 	fi
 
-	for node in $(definition_nodes); do
+	for node in $(scenario_install_nodes); do
 		phd_log LOG_DEBUG "Installing packages \"$packages\" on node \"$node\""
 		phd_cmd_exec "yum install -y $packages" "$node"
 		if [ $? -ne 0 ]; then
@@ -229,6 +241,9 @@ scenario_script_exec()
 	local script_num=0
 	local script=""
 	local nodes=""
+	local node=""
+	local rc=0
+	local expected_rc=0
 
 	while true; do
 		script_num=$(($script_num + 1))
@@ -237,6 +252,7 @@ scenario_script_exec()
 			break
 		fi
 
+		expected_rc=$(eval echo "\$${SENV_PREFIX}_require_exitcode${script_num}")
 		nodes=$(eval echo "\$${SENV_PREFIX}_target${script_num}")
 		if [ -z "$nodes" ]; then
 			nodes=$(defintion_nodes)
@@ -248,7 +264,16 @@ scenario_script_exec()
 		fi
 
 		phd_log LOG_NOTICE "executing $script on nodes \"$nodes\""
-		phd_script_exec $script "$nodes"
+		for node in $(echo $nodes); do
+			phd_script_exec $script "$node"
+			rc=$?
+			if [ -z "$expected_rc" ]; then
+				continue
+			fi
+			if [ "$expected_rc" -ne "$rc" ]; then
+				phd_exit_failure "Script $script_num exit code is $rc, expected $expected_rc Exiting."
+			fi
+		done
 	done
 
 	return 0
@@ -262,7 +287,7 @@ scenario_verify()
 		local value=$(echo $line | awk -F= '{print $2}')
 
 		case $key in
-		cluster_init|cluster_destroy|packages)
+		cluster_init|cluster_destroy|packages|install_local)
 			continue ;;
 		*) : ;;
 		esac
