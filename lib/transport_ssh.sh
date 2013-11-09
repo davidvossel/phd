@@ -18,6 +18,18 @@ phd_ssh_script_exec()
 	done
 }
 
+phd_ssh_cp()
+{
+	local src=$1
+	local dest=$2
+	local nodes=$3
+	local node
+
+	for node in $(echo $nodes); do
+		scp $src $node:${dest}
+	done
+}
+
 phd_ssh_cmd_exec()
 {
 	local cmd=$1

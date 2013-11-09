@@ -17,6 +17,14 @@ pacemaker_cluster_stop()
 	local node
 
 	for node in $(echo $nodes); do
+		phd_cmd_exec "yum list installed | grep pacemaker > /dev/null 2>&1" "$node"
+		if [ $? -ne 0 ]; then
+			continue
+		fi
+		phd_cmd_exec "yum list installed | grep pcs > /dev/null 2>&1" "$node"
+		if [ $? -ne 0 ]; then
+			phd_cmd_exec "yum install -y pcs" "$node"
+		fi
 		phd_cmd_exec "pcs cluster stop" "$node"
 		if [ "$?" -eq 0 ]; then
 			phd_cmd_exec "service corosync stop" "$node"

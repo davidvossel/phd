@@ -58,6 +58,16 @@ phd_script_exec()
 	phd_ssh_script_exec $script "$nodes"
 }
 
+phd_node_cp()
+{
+	local src=$1
+	local dest=$2
+	local nodes=$3
+	
+	# TODO - support multiple transports
+	phd_ssh_cp "$src" "$dest" "$nodes"
+}
+
 phd_exit_failure()
 {
 	local reason=$1

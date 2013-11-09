@@ -35,6 +35,11 @@ definition_unpack()
 	return 0
 }
 
+definition_package_dir()
+{
+	eval echo "\$${PHDENV_PREFIX}_package_dir"
+}
+
 definition_nodes()
 {
 	eval echo "\$${PHDENV_PREFIX}_nodes"

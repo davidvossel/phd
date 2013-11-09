@@ -19,6 +19,13 @@ scenario_clean()
 	phd_clear_vars "$SENV_PREFIX"
 }
 
+scenario_clean_nodes()
+{
+	local nodes=$(definition_nodes)
+	phd_cmd_exec "rm -rf $TMP_DIR" "$nodes"
+	phd_cmd_exec "mkdir -p $TMP_DIR" "$nodes"
+}
+
 scenario_script_add_env()
 {
 	local script=$1
@@ -104,12 +111,62 @@ print_scenario()
 	return 0
 }
 
+scenario_custom_package_install()
+{
+	local package_dir=$(definition_package_dir)
+	local packages=""
+	local rpms=""
+	local entry=""
+	local nodes=$(definition_nodes)
+	local node
+
+	if [ -z "$package_dir" ]; then
+		echo ""
+		return
+	fi
+
+
+	phd_cmd_exec "mkdir -p $TMP_DIR/phd_rpms/" "$nodes"
+
+	for entry in $(ls ${package_dir}*.rpm); do
+		packages="$packages $(rpm -qp -i $entry | grep -e 'Name' | sed 's/Name.*: //')"
+		rpms="$rpms $entry"
+		phd_node_cp "$entry" "$TMP_DIR/phd_rpms/" "$nodes"
+	done
+
+	if [ -z "$rpms" ]; then
+		return
+	fi
+
+	for node in $(echo $nodes); do
+		phd_log LOG_DEBUG "Installing custom packages '$packages' on node '$node'"
+		phd_cmd_exec "yum remove -y $packages" "$node"
+		if [ $? -ne 0 ]; then
+			phd_exit_failure "Could not clean custom packages on \"$node\" before install"
+		fi
+	    phd_cmd_exec "yum install -y $TMP_DIR/phd_rpms/*.rpm" "$node"
+		if [ $? -ne 0 ]; then
+			phd_exit_failure "Could not install custom packages on \"$node\""
+		fi
+	done
+	
+	export "${SENV_PREFIX}_custom_packages=$packages"
+}
+
 scenario_package_install()
 {
 	local packages=$(eval echo "\$${SREQ_PREFIX}_packages")
 	local package
 	local node
+	local custom_packages
+	
+	scenario_custom_package_install
+	custom_packages=$(eval echo "\$${SENV_PREFIX}_custom_packages")
 
+	# make sure not to try and install custom packages that overlap
+	# with the scenario packages
+    local unique=$(echo "$packages $custom_packages" | sed 's/\s/\n/g' | sort | uniq -u)
+	packages=$(echo "$packages $unique" | sed 's/\s/\n/g' | sort | uniq -d | tr '\n' ' ')
 	if [ -z "$packages" ]; then
 		return 0
 	fi
@@ -118,7 +175,7 @@ scenario_package_install()
 		phd_log LOG_DEBUG "Installing packages \"$packages\" on node \"$node\""
 		phd_cmd_exec "yum install -y $packages" "$node"
 		if [ $? -ne 0 ]; then
-			php_exit_failure "Could not install required packages on node \"$node\""
+			phd_exit_failure "Could not install required packages on node \"$node\""
 		fi
 
 		for package in $(echo $packages); do
@@ -137,12 +194,17 @@ scenario_package_install()
 scenario_cluster_destroy()
 {
 	local cluster_destroy=$(eval echo "\$${SREQ_PREFIX}_cluster_destroy")
+	local cluster_init=$(eval echo "\$${SREQ_PREFIX}_cluster_init")
+	local destroy=1
 
-	if [ -z "$cluster_destroy" ]; then
-		return
+	if [ -n "$cluster_destroy" ]; then
+		destroy=1
+	fi
+	if [ -n "$cluster_init" ]; then
+		destroy=1
 	fi
 
-	if [ "$cluster_destroy" -eq "1" ]; then
+	if [ "$destroy" -eq "1" ]; then
 		pacemaker_cluster_stop
 		pacemaker_cluster_clean
 	fi
@@ -157,8 +219,6 @@ scenario_cluster_init()
 	fi
 
 	if [ "$cluster_init" -eq "1" ]; then
-		pacemaker_cluster_stop
-		pacemaker_cluster_clean
 		pacemaker_cluster_init
 		pacemaker_cluster_start
 	fi
@@ -183,6 +243,8 @@ scenario_script_exec()
 		fi
 		if [ "$nodes" = "all" ]; then
 			nodes=$(definition_nodes)
+		elif [ "$nodes" = "local" ]; then
+			nodes=$(hostname)
 		fi
 
 		phd_log LOG_NOTICE "executing $script on nodes \"$nodes\""
@@ -220,8 +282,9 @@ scenario_verify()
 scenario_exec()
 {
 	scenario_verify
-	scenario_package_install
+	scenario_clean_nodes
 	scenario_cluster_destroy
+	scenario_package_install
 	scenario_cluster_init
 	scenario_script_exec
 }
