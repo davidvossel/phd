@@ -43,7 +43,7 @@ scenario_install_nodes()
 	local nodes=$(definition_nodes)
 	local install_local=$(eval echo "\$${SREQ_PREFIX}_install_local")
 
-	if [ "$install_local" -eq 1 ]; then
+	if [ "$install_local" = "1" ]; then
 		echo "$nodes $HOSTNAME" | sed 's/\s/\n/g' | sort | uniq -u | tr '\n' ' '
 	else 
 		echo "$nodes"
@@ -114,7 +114,8 @@ scenario_unpack()
 			fi
 			export "${SENV_PREFIX}_${key}${script_num}=${cleaned_value}"
 		fi
-	done < <(cat $1 | grep -v -e ".*#" | awk 'NF')
+	# TODO this is bad, only skip over lines that start with '#' or whitespace then '#'
+	done < <(cat $1 | grep -v -e ".*#")
 }
 
 print_scenario()
@@ -255,7 +256,7 @@ scenario_script_exec()
 		expected_rc=$(eval echo "\$${SENV_PREFIX}_require_exitcode${script_num}")
 		nodes=$(eval echo "\$${SENV_PREFIX}_target${script_num}")
 		if [ -z "$nodes" ]; then
-			nodes=$(defintion_nodes)
+			nodes=$(definition_nodes)
 		fi
 		if [ "$nodes" = "all" ]; then
 			nodes=$(definition_nodes)
