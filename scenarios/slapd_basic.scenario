@@ -1,0 +1,85 @@
+# Basic HA slapd setup without shared storage
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs resource-agents openldap-servers openldap openldap-clients
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+target=all
+require_exitcode=0
+....
+systemctl stop slapd
+sleep 1
+
+export database_cfg="/etc/openldap/slapd.d/cn=config/olcDatabase={2}hdb.ldif"
+export monitor_cfg="/etc/openldap/slapd.d/cn=config/olcDatabase={1}monitor.ldif"
+export SLAPD_PASS_HASH=$(slappasswd -s password)
+
+grep "olcRootPW" $database_cfg
+if [ $? -eq 0 ]; then
+	sed -i.bak "s/olcRootPW: .*/olcRootPW: $SLAPD_PASS_HASH/g" $database_cfg
+else
+	echo "olcRootPW: $SLAPD_PASS_HASH" >> $database_cfg
+fi
+
+sed -i.bak "s/dc=my-domain,dc=com/dc=test,dc=lan/g" $database_cfg
+sed -i.bak "s/dc=my-domain,dc=com/dc=test,dc=lan/g" $monitor_cfg
+
+chown -Rf ldap:ldap /var/lib/ldap/
+
+systemctl start slapd
+
+ldapsearch -x -b 'dc=test,dc=lan' -s base '(objectclass=*)' namingContexts
+if [ $? -eq 0 ]; then
+	systemctl stop slapd
+	exit 0
+fi
+
+rm -f base.ldif
+cat <<-END >> base.ldif
+dn: dc=test,dc=lan
+o: test
+objectClass: dcObject
+objectClass: organization
+
+dn: ou=People,dc=test,dc=lan
+ou: People
+objectClass: top
+objectClass: organizationalUnit
+
+dn: ou=Group,dc=test,dc=lan
+ou: Group
+objectClass: top
+objectClass: organizationalUnit
+END
+
+ldapadd -w password -x -D "cn=Manager,dc=test,dc=lan" -f ./base.ldif
+
+systemctl stop slapd
+sleep 2
+systemctl start slapd
+
+ldapsearch -x -b 'dc=test,dc=lan' -s base '(objectclass=*)' namingContexts
+if [ $? -eq 0 ]; then
+	systemctl stop slapd
+	exit 0
+fi
+
+systemctl stop slapd
+exit 1
+....
+
+target=$PHD_ENV_nodes1
+....
+pcs property set stonith-enabled=false
+pcs property set no-quorum-policy=ignore
+pcs resource create ldap ocf:heartbeat:slapd config=/etc/openldap/slapd.d
+....
