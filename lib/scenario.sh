@@ -197,11 +197,73 @@ scenario_package_install()
 				phd_exit_failure "Could not install required package \"$package\" on node \"$node\""
 			fi
 		done
-
-
 	done
 
 	return 0
+}
+
+scenario_storage_destroy()
+{
+	local wipe=$(eval echo "\$${SREQ_PREFIX}_clean_shared_storage")
+	local nodes=$(definition_nodes)
+	local umount_script="$TMP_DIR/PHD_STORAGE_UMOUNT"
+	local wipe_script="$TMP_DIR/PHD_STORAGE_WIPE"
+	local shared_dev=$(definition_shared_dev)
+
+	if [ "$wipe" -ne 1 ]; then
+		return
+	fi
+
+	if [ -z "$shared_dev" ]; then
+		phd_exit_failure "Could not clear shared storage, cluster definition contains no shared storage."
+	fi
+
+	cat <<- END > $umount_script
+#!/bin/sh
+devices="$shared_dev"
+for dev in \$(echo \$devices); do
+	for vg in \$(pvs --noheadings \$dev | awk '{print \$2}'); do
+		for lv in \$(lvs vg_normal --noheadings | awk '{print \$1}'); do
+			fuser -mkv /dev/\$vg/\$lv
+			umount /dev/\$vg/\$lv
+			lvchange -an \$vg/\$lv
+		done
+		vgchange -an \$vg
+	done
+	fuser -mkv \$dev
+	umount \$dev
+done
+END
+
+	cat <<- END > $wipe_script
+#!/bin/sh
+devices="$shared_dev"
+for dev in \$(echo \$devices); do
+	for vg in \$(pvs --noheadings \$dev | awk '{print \$2}'); do
+		echo "removing \$vg"
+		vgremove -f \$vg
+		if [ \$? -ne 0 ]; then 
+			echo "failed to remove volume group (\$vg)"
+		fi
+	done
+	size=\$(blockdev --getsize64 \$dev)
+	if [ \$? -ne 0 ]; then
+		echo "Failed to retrieve block device (\$dev) size"
+		exit 1
+	fi
+	dd if=/dev/zero of=/dev/vdb bs=4M count=\$size iflag=count_bytes
+	if [ \$? -ne 0 ]; then
+		echo "Failed to clear block device (\$dev)"
+		exit 1
+	fi
+done
+END
+
+	phd_script_exec "$umount_script" "$nodes"
+	phd_script_exec "$wipe_script" "$(definition_node 1)"
+	if [ $? -ne 0 ]; then
+		phd_exit_failure "failed to wipe shared storage devices"
+	fi
 }
 
 scenario_cluster_destroy()
@@ -288,7 +350,7 @@ scenario_verify()
 		local value=$(echo $line | awk -F= '{print $2}')
 
 		case $key in
-		cluster_init|cluster_destroy|packages|install_local)
+		cluster_init|cluster_destroy|packages|install_local|clean_shared_storage)
 			continue ;;
 		*) : ;;
 		esac
@@ -310,6 +372,7 @@ scenario_exec()
 	scenario_verify
 	scenario_clean_nodes
 	scenario_cluster_destroy
+	scenario_storage_destroy
 	scenario_package_install
 	scenario_cluster_init
 	scenario_script_exec

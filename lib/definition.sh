@@ -40,6 +40,11 @@ definition_package_dir()
 	eval echo "\$${PHDENV_PREFIX}_package_dir"
 }
 
+definition_shared_dev()
+{
+	eval echo "\$${PHDENV_PREFIX}_shared_storage"
+}
+
 definition_nodes()
 {
 	eval echo "\$${PHDENV_PREFIX}_nodes"
