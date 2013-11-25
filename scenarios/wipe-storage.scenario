@@ -1,0 +1,11 @@
+# Destroy a cluster and wipe shared storage
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=1
+shared_storage=1
+packages=pacemaker corosync pcs
+cluster_destroy=1
+clean_shared_storage=1
