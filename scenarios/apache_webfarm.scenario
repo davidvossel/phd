@@ -6,16 +6,10 @@
 = REQUIREMENTS =
 nodes=2
 shared_storage=1
+floating_ips=1
 packages=pacemaker corosync pcs httpd wget lvm2
 cluster_init=1
-storage_init=1
-
-##############################
-# Scenario Variable Defaults #
-##############################
-= LOCAL_VARIABLES =
-volume_size=512m
-
+clean_shared_storage=1
 
 ######################
 # Deployment Scripts #
@@ -27,7 +21,9 @@ volume_size=512m
 ##
 target=all
 ....
-cat << END >>  /etc/httpd/conf/httpd.conf
+grep "^<Location /server-status" /etc/httpd/conf/httpd.conf
+if [ "$?" -ne "0" ]; then
+	cat << END >>  /etc/httpd/conf/httpd.conf
 <Location /server-status>
     SetHandler server-status
     Order deny,allow
@@ -35,6 +31,7 @@ cat << END >>  /etc/httpd/conf/httpd.conf
     Allow from 127.0.0.1
 </Location>
 END
+fi
 ....
 
 ##
@@ -42,18 +39,26 @@ END
 ##
 target=all
 ....
+volume_list=$(echo -n '"' && vgs --noheadings -o vg_name | tr -d ' ' | tr '\n' ',' | sed -e "s/,/\",\"/g" | sed -e "s/\",\"$//g" && echo '"')
+sed -i.bak "s/#volume_list =.*/#volume_list = [ $volume_list ]/g" /etc/lvm/lvm.conf
 lvmconf --disable-cluster
 ....
 
 ##
 # Create logical volume for web data
 ##
-target=$PHD_ENV_node1
+target=$PHD_ENV_nodes1
+require_exitcode=0
 ....
 pvcreate $PHD_ENV_shared_storage1
 vgcreate cluster_vg /dev/vdb
-lvcreate -L${AF_volume_size}M -n cluster_lv cluster_vg
+lvcreate -L64M -n cluster_lv cluster_vg
 mkfs.ext4 /dev/cluster_vg/cluster_lv
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+
 
 mount /dev/cluster_vg/cluster_lv /var/www/
 mkdir /var/www/html
@@ -76,25 +81,27 @@ lvchange -an cluster_vg/cluster_lv
 ##
 target=all
 ....
-volume_list=$(echo -n '"' && vgs --noheadings -o vg_name | tr -d ' ' | tr '\n' ',' | sed -e "s/,/\",\"/g" | sed -e "s/\",\"$//g" && echo '"')
-sed -i.bak 's/^volume_list = .*/volume_list = [ $(volume_list) ]/g' /etc/lvm/lvm.conf
-sed -i.bak 's/.* volume_list = .*/volume_list = [ $(volume_list) ]/g' /etc/lvm/lvm.conf
-sed -i.bak 's/.*#volume_list = .*/volume_list = [ $(volume_list) ]/g' /etc/lvm/lvm.conf
+sed -i.bak "s/#volume_list =/volume_list =/g" /etc/lvm/lvm.conf
 
-dracut -H -f /boot/initramfs-$(uname -r).img $(uname -r)
+#dracut -H -f /boot/initramfs-$(uname -r).img $(uname -r)
 ....
 
 ##
 # Make the cluster storage resources
 ##
-target=$PHD_ENV_target1
+target=$PHD_ENV_nodes1
 ....
 tmpfile=mktemp
-pcs cluster cib $tmpfile
 
-pcs -f $tmpfile resource create web_vg LVM volgroupname=cluster_vg exclusive=true
-pcs -f $tmpfile resource create web_data Filesystem device="/dev/cluster_vg/cluster_lv" directory="var/www" fstype="ext4" on monitor interval=30s on-fail=fence
-pcs -f $tmpfile resource create web_daemon apache
-pcs -f $tmpfile group add web_group web_vg web_data web_daemon
+pcs property set stonith-enabled=false
+pcs property set no-quorum-policy=ignore
+
+pcs cluster cib $tmpfile
+pcs -f $tmpfile resource create web-vg LVM volgrpname=cluster_vg exclusive=true
+pcs -f $tmpfile resource create web-data Filesystem device="/dev/cluster_vg/cluster_lv" directory="/var/www" fstype="ext4" op monitor interval=30s on-fail=fence
+pcs -f $tmpfile resource create web-site apache
+pcs -f $tmpfile resource create web-ip ocf:heartbeat:IPaddr2 ip=$PHD_ENV_floating_ips1
+pcs -f $tmpfile resource group add web-group web-vg web-data web-site web-ip
+pcs cluster cib-push $tmpfile
 ....
 
