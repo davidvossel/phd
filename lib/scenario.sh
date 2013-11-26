@@ -104,18 +104,21 @@ scenario_unpack()
 		if [ "$writing_script" -eq 1 ]; then
 			echo "$line" >> ${cur_script}
 		else
+			if [ -z "$cleaned" ]; then
+				continue
+			fi
+
 			local key=$(echo $cleaned | awk -F= '{print $1}')
 			local value=$(echo $cleaned | awk -F= '{print $2}')
 
 			local cleaned_value=$(phd_get_value $value)
 			if [ -z "$cleaned_value" ]; then
-				phd_log LOG_ERR "no value found for \"$key=$value\" for script number $script_num in scenario file"
+				phd_log LOG_ERR "no value found for \"$line\" for script number $script_num in scenario file"
 				continue
 			fi
 			export "${SENV_PREFIX}_${key}${script_num}=${cleaned_value}"
 		fi
-	# TODO this is bad, only skip over lines that start with '#' or whitespace then '#'
-	done < <(cat $1 | grep -v -e ".*#")
+	done < <(cat $1 | grep -v -e "[[:space:]]#" -e "^#")
 }
 
 print_scenario()
@@ -221,6 +224,8 @@ scenario_storage_destroy()
 	cat <<- END > $umount_script
 #!/bin/sh
 devices="$shared_dev"
+sed -i.bak "s/.* volume_list =.*/#volume_list = /g" /etc/lvm/lvm.conf
+sed -i.bak "s/^volume_list =.*/#volume_list = /g" /etc/lvm/lvm.conf
 for dev in \$(echo \$devices); do
 	for vg in \$(pvs --noheadings \$dev | awk '{print \$2}'); do
 		for lv in \$(lvs vg_normal --noheadings | awk '{print \$1}'); do
