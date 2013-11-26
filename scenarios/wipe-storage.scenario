@@ -6,6 +6,6 @@
 = REQUIREMENTS =
 nodes=1
 shared_storage=1
-packages=pacemaker corosync pcs
+packages=pacemaker corosync pcs lvm2
 cluster_destroy=1
 clean_shared_storage=1
