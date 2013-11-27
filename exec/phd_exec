@@ -1,0 +1,71 @@
+#!/bin/bash
+
+if [ -z "$PHDCONST_ROOT" ]; then
+	if [ "$(basename $(pwd))" = "exec" ]; then
+		PHDCONST_ROOT=$(dirname $(pwd))
+	else
+		PHDCONST_ROOT=$(pwd)
+	fi
+fi
+
+. ${PHDCONST_ROOT}/lib/transport_ssh.sh
+. ${PHDCONST_ROOT}/lib/utils.sh
+. ${PHDCONST_ROOT}/lib/scenario.sh
+. ${PHDCONST_ROOT}/lib/definition.sh
+
+
+function helptext() {
+	echo "==========================================================="
+	echo "phd_exec - A tool for executing pacemaker cluster scenarios"
+	echo "==========================================================="
+	echo ""
+	echo "Usage: phd_exec <cluster definition> <scenario file> [options]"
+	echo "The default behavior when no options are specified is to execute"
+	echo "The scenario file on the given cluster definition"
+	echo ""
+	echo "Options"
+	echo "-p, --print-env	Print cluster definition environment variables"
+	echo "-c, --check	    Verify cluster definition can run the scenario file"
+	echo ""
+	exit $1
+}
+
+definition=$1
+shift
+scenario=$1
+shift
+
+if [ -z "$scenario" ]; then
+	echo "Error: Must provide valid cluster definition and scenario file"
+	echo ""
+	helptext 1
+fi
+
+print_env=0
+check_only=0
+while true ; do
+	case "$1" in
+	--help|-h|-\?) helptext 0;;
+	-p|--print-env) print_env=1; shift;;
+	-c|--check)     check_only=1; shift;;
+	"") break;;
+	*) helptext 1;;
+	esac
+done
+
+definition_unpack $definition
+scenario_unpack $scenario
+
+if [ $print_env -eq 1 ]; then
+	print_definition
+	print_scenario
+	exit 0
+fi
+
+if [ $check_only -eq 1 ]; then
+	scenario_verify
+	echo "Success"
+	exit 0
+fi
+
+scenario_exec

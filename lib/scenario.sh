@@ -320,7 +320,6 @@ scenario_verify()
 	if [ $res -ne 0 ]; then
 		phd_exit_failure "Cluster defintion does not meet all of the scenarios requirements"
 	fi
-
 }
 
 scenario_exec()
