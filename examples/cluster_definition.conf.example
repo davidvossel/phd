@@ -14,6 +14,11 @@
 ##
 
 ##
+# Custom RPMS to use during scenario execution
+# package_dir=/root/rpmbuild/RPMS/x86_64/
+##
+#
+##
 # shared storage devices available to all nodes
 ##
 # shared_storage=/dev/vdb /dev/vdc
