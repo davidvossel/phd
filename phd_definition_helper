@@ -1,0 +1,64 @@
+#!/bin/bash
+
+function helptext() {
+	echo "====================================================================="
+	echo "phd_definition_helper - A tool for generating phd cluster definitions"
+	echo "====================================================================="
+	echo ""
+	echo "Usage: phd_definition_helper [options]"
+	echo ""
+	echo "Options"
+	echo "-f, --file-name	Save definition to a specific file"
+	echo "-h, --help	Print help text"
+	echo ""
+	exit $1
+}
+
+while true ; do
+	case "$1" in
+	--help|-h|-\?) helptext 0;;
+	--file-name|-f) file=$1
+		shift;;
+	"") break;;
+	*) helptext 1;;
+	esac
+done
+
+if [ -z "$file" ]; then
+	file=$(mktemp cluster_definiton_XXX.txt)
+fi
+
+echo "Cluster Definition" > $file
+
+echo "Writing cluster definition to file ($file)"
+echo ""
+
+# help text
+# cluster definition variable
+# file to write to
+function read_helper()
+{
+	echo ""
+	echo "$1"
+	echo "Press enter to skip"
+	echo ""
+	read value
+	if [ -n "$value" ]; then
+		echo "$2=$value" >> $3
+	fi
+}
+
+read_helper "List all the nodes in the cluster, separate node names with a space" "nodes" "$file"
+read_helper "List available floating ips within cluster network, separate entries with a space." "floating_ips" "$file"
+read_helper "List available shared storage devices in cluster, separate entries with a space" "shared_storage" "$file"
+read_helper "Enter location of folder with custom RPMs to install during scenario execution." "package_dir" "$file"
+
+echo ""
+echo "Done..."
+echo ""
+echo "------ your cluster definition ------"
+cat $file
+echo "-------------------------------------"
+echo ""
+echo "execute cluster definition using 'php_exec $file <scenario file>'"
+
