@@ -1,0 +1,136 @@
+# NFS server on clusterd lvm + shared storage
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+shared_storage=1
+floating_ips=1
+packages=pacemaker corosync pcs dlm lvm2 lvm2-cluster nfs-utils resource-agents
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize lvm
+##
+target=all
+....
+lvmconf --enable-cluster
+systemctl disable nfs-server
+systemctl stop nfs-server
+systemctl disable nfs-lock
+systemctl stop nfs-lock
+....
+
+target=$PHD_ENV_nodes1
+require_exitcode=0
+....
+tmpfile=mktemp
+
+pcs property set stonith-enabled=false
+
+pcs cluster cib $tmpfile
+
+pcs -f $tmpfile resource create dlm controld op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+pcs -f $tmpfile resource create clvmd lsb:clvmd op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+pcs -f $tmpfile constraint order start dlm-clone then clvmd-clone
+pcs -f $tmpfile constraint colocation add clvmd-clone with dlm-clone
+
+pcs cluster cib-push $tmpfile
+
+STOP_TIMEOUT=45
+lapse_sec=0
+stop_time=$(date +%s)
+pidof clvmd
+while [ "$?" -ne "0" ]; do
+	lapse_sec=`expr $(date +%s) - $stop_time`
+	if [ $lapse_sec -ge $STOP_TIMEOUT ]; then
+		echo "Timed out waiting for clvmd to start"
+		exit 1
+	fi
+
+	sleep 1
+	pidof clvmd
+done
+
+....
+
+##
+# Make the cluster storage volume group
+##
+target=$PHD_ENV_nodes1
+require_exitcode=0
+....
+dev=$PHD_ENV_shared_storage1
+
+pvcreate $dev
+vgcreate -cy cluster_vg $dev
+lvcreate -L128M -n cluster_lv cluster_vg
+mkfs.ext4 /dev/cluster_vg/cluster_lv
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+vgchange -an cluster_vg
+....
+
+##
+# Make the lvm resources and floating ip
+##
+target=$PHD_ENV_nodes1
+require_exitcode=0
+....
+pcs cluster cib lvm-ext4.cib
+pcs -f lvm-ext4.cib resource create cluster_vg LVM volgrpname=cluster_vg exclusive=true
+pcs -f lvm-ext4.cib resource create nfsshare Filesystem device=/dev/cluster_vg/cluster_lv directory=/nfsshare fstype=ext4
+pcs -f lvm-ext4.cib resource create nfs_ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24
+pcs -f lvm-ext4.cib resource group add nfs-group cluster_vg nfsshare nfs_ip
+pcs -f lvm-ext4.cib constraint order start clvmd-clone then nfs-group
+pcs -f lvm-ext4.cib constraint colocation add nfs-group with clvmd-clone
+# put the nfs group on a node we can predict
+pcs -f lvm-ext4.cib constraint location nfs-group prefers $PHD_ENV_nodes1
+pcs cluster cib-push lvm-ext4.cib
+
+STOP_TIMEOUT=45
+lapse_sec=0
+stop_time=$(date +%s)
+cat /proc/mounts | grep nfsshare
+while [ "$?" -ne "0" ]; do
+	lapse_sec=`expr $(date +%s) - $stop_time`
+	if [ $lapse_sec -ge $STOP_TIMEOUT ]; then
+		echo "Timed out waiting for nfsshare to mount"
+		exit 1
+	fi
+	sleep 1
+	cat /proc/mounts | grep nfsshare
+done
+....
+
+
+##
+# NFS share setup
+##
+target=$PHD_ENV_nodes1
+require_exitcode=0
+....
+suffix=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+
+mkdir /nfsshare/clientdata
+touch /nfsshare/clientdata/clientsharefile
+
+pcs cluster cib nfs-rsc.cib
+pcs -f nfs-rsc.cib resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo nfs_ip=$PHD_ENV_floating_ips1
+pcs -f nfs-rsc.cib resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync directory=/nfsshare/clientdata fsid=0
+pcs -f nfs-rsc.cib resource group add nfs-group nfs-daemon nfs-export
+pcs cluster cib-push nfs-rsc.cib
+
+....
+
+
+
