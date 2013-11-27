@@ -90,7 +90,7 @@ scenario_unpack()
 				writing_script=1
 				cur_script=${TMP_DIR}/${SCRIPT_PREFIX}${script_num}
 				export "${SCRIPT_PREFIX}_${script_num}=${cur_script}"
-				touch ${cur_script}
+				echo "#!/bin/bash" > ${cur_script}
 				scenario_script_add_env "$cur_script"
 				chmod 755 ${cur_script}
 			else
@@ -231,6 +231,7 @@ cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
 if [ $? -eq 0 ]; then
 	service corosync start
 	service dlm start
+	sleep 1
 fi
 END
 
@@ -241,6 +242,7 @@ cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
 if [ $? -eq 0 ]; then
 	echo "starting clvmd"
 	service clvmd start
+	sleep 1
 fi
 END
 	cat <<- END > $clvmd_stop
