@@ -10,7 +10,7 @@ NOTE, The node executing this script must be capable of ssh communication withou
 
 * echo "nodes=node1,node2,node3" > cluster_definition.conf
 * echo "floating_ips=192.168.122.200" >> cluster_definition.conf
-* ./php_exec.sh cluster_definition.conf scenarios/example.scenario
+* ./php_exec cluster_definition.conf scenarios/example.scenario
 
 ## Example Apache deployment on shared storage
 Execute an apache server with the /var/www file living on shared storage.
@@ -18,8 +18,8 @@ NOTE, The node executing this script must be capable of ssh communication withou
 
 * echo "nodes=node1,node2,node3" > cluster_definition.conf
 * echo "floating_ips=192.168.122.200" >> cluster_definition.conf
-* echo "floating_ips=/dev/vdb" >> cluster_definition.conf
-* ./php_exec.sh cluster_definition.conf scenarios/apache_shared_lvm.scenario
+* echo "shared_storage=/dev/vdb" >> cluster_definition.conf
+* ./php_exec cluster_definition.conf scenarios/apache_shared_lvm.scenario
 
 ## Example NFS deployment on shared storage
 Execute an NFS deployment on top of shared storage
@@ -27,6 +27,6 @@ NOTE, The node executing this script must be capable of ssh communication withou
 
 * echo "nodes=node1,node2,node3" > cluster_definition.conf
 * echo "floating_ips=192.168.122.200" >> cluster_definition.conf
-* echo "floating_ips=/dev/vdb" >> cluster_definition.conf
-* ./php_exec.sh cluster_definition.conf scenarios/nfs_shared_clvmd.scenario
+* echo "shared_storage=/dev/vdb" >> cluster_definition.conf
+* ./php_exec cluster_definition.conf scenarios/nfs_shared_clvmd.scenario
 
