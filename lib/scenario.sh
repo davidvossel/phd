@@ -325,11 +325,39 @@ scenario_verify()
 
 scenario_exec()
 {
+	phd_log LOG_NOTICE "=======================================================" 
+	phd_log LOG_NOTICE "==== Verifying Scenario against Cluster Definition ====" 
+	phd_log LOG_NOTICE "=======================================================" 
 	scenario_verify
+
 	scenario_clean_nodes
+
+	phd_log LOG_NOTICE "====================================" 
+	phd_log LOG_NOTICE "====  Checking Cluster Shutdown ====" 
+	phd_log LOG_NOTICE "====================================" 
 	scenario_cluster_destroy
+
+	phd_log LOG_NOTICE "==================================" 
+	phd_log LOG_NOTICE "====  Checking Shared Storage ====" 
+	phd_log LOG_NOTICE "==================================" 
 	scenario_storage_destroy
+
+	phd_log LOG_NOTICE "=========================" 
+	phd_log LOG_NOTICE "==== Package Install ====" 
+	phd_log LOG_NOTICE "=========================" 
 	scenario_package_install
+
+	phd_log LOG_NOTICE "==================================" 
+	phd_log LOG_NOTICE "==== Checking Cluster Startup ====" 
+	phd_log LOG_NOTICE "==================================" 
 	scenario_cluster_init
+
+	phd_log LOG_NOTICE "====================================" 
+	phd_log LOG_NOTICE "==== Executing Scenario Scripts ====" 
+	phd_log LOG_NOTICE "====================================" 
 	scenario_script_exec
+
+	phd_log LOG_NOTICE "====================================" 
+	phd_log LOG_NOTICE "====           DONE             ====" 
+	phd_log LOG_NOTICE "====================================" 
 }
