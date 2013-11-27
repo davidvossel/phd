@@ -14,7 +14,7 @@ shared_storage_destroy()
 #!/bin/sh
 
 cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
-if [ $? -eq 0 ]; then
+if [ \$? -eq 0 ]; then
 	service corosync start
 	service dlm start
 	sleep 1
@@ -25,7 +25,7 @@ END
 #!/bin/sh
 
 cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
-if [ $? -eq 0 ]; then
+if [ \$? -eq 0 ]; then
 	echo "starting clvmd"
 	service clvmd start
 	sleep 1
@@ -35,7 +35,7 @@ END
 #!/bin/sh
 
 cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
-if [ $? -eq 0 ]; then
+if [ \$? -eq 0 ]; then
 	echo "stopping clvmd"
 	service clvmd stop
 	service dlm stop
