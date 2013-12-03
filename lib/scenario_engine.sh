@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. ${PHDCONST_ROOT}/lib/utils.sh
+. ${PHDCONST_ROOT}/lib/scenario_utils_api.sh
 . ${PHDCONST_ROOT}/lib/pacemaker.sh
 . ${PHDCONST_ROOT}/lib/shared_storage.sh
 
@@ -210,6 +210,10 @@ scenario_storage_destroy()
 {
 	local wipe=$(eval echo "\$${SREQ_PREFIX}_clean_shared_storage")
 	local shared_dev=$(definition_shared_dev)
+
+	if [ -z "$wipe" ]; then
+		return
+	fi
 
 	if [ "$wipe" -ne 1 ]; then
 		return

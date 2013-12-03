@@ -9,8 +9,8 @@ if [ -z "$PHDCONST_ROOT" ]; then
 fi
 
 . ${PHDCONST_ROOT}/lib/transport_ssh.sh
-. ${PHDCONST_ROOT}/lib/utils.sh
-. ${PHDCONST_ROOT}/lib/scenario.sh
+. ${PHDCONST_ROOT}/lib/scenario_utils_api.sh
+. ${PHDCONST_ROOT}/lib/scenario_engine.sh
 . ${PHDCONST_ROOT}/lib/definition.sh
 
 

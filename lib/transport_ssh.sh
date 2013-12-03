@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#. ${PHDCONST_ROOT}/lib/utils.sh
+#. ${PHDCONST_ROOT}/lib/scenario_utils_api.sh
 
 phd_ssh_script_exec()
 {
