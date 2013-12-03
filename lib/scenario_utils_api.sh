@@ -65,7 +65,9 @@ phd_node_cp()
 	for node in $(echo $nodes); do
 		phd_log LOG_DEBUG "copying file \"$src\" to node \"$node\" destination location \"$dest\""
 		phd_ssh_cp "$src" "$dest" "$node"
-		phd_cmd_exec "chmod 755 $dest" "$node"
+		if [ -n "$permissions" ]; then
+			phd_cmd_exec "chmod $permissions $dest" "$node"
+		fi
 	done
 }
 

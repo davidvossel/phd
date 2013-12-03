@@ -278,6 +278,15 @@ scenario_distribute_api()
 	done
 }
 
+scenario_environment_defaults()
+{
+	local nodes=$(definition_nodes)
+
+	# install configs and other environment constants that we
+	# need to be consistent for all scenarios.
+	phd_node_cp "${PHDCONST_ROOT}/lib/lvm.conf.phd_default" "/etc/lvm/lvm.conf" "$nodes" "644"
+}
+
 scenario_script_exec()
 {
 	local script_num=0
@@ -377,7 +386,7 @@ scenario_exec()
 	phd_log LOG_NOTICE "===================================="
 	phd_log LOG_NOTICE "==== Distribute Default Configs ====" 
 	phd_log LOG_NOTICE "====================================" 
-	#TODO create a environment files directory and copy files over to it to all the nodes
+	scenario_environment_defaults
 
 	phd_log LOG_NOTICE "==================================" 
 	phd_log LOG_NOTICE "==== Checking Cluster Startup ====" 
