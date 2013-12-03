@@ -46,9 +46,13 @@ phd_cmd_exec()
 	local nodes=$2
 	local node
 
+	# execute locally if no nodes are given
+	if [ -z "$nodes" ]; then
+		$cmd
+		return $?
+	fi
 	# TODO - support multiple transports
 	for node in $(echo $nodes); do
-		phd_log LOG_DEBUG "executing cmd \"$cmd\" on node \"$node\""		
 		phd_ssh_cmd_exec "$cmd" "$node"
 	done
 }
@@ -80,8 +84,8 @@ phd_script_exec()
 
 	for node in $(echo $nodes); do
 		phd_log LOG_DEBUG "executing script \"$script\" on node \"$node\""		
-		phd_cmd_exec "mkdir -p $dir" "$node"
-		phd_node_cp "$script" "$script" "$node" "755"
+		phd_cmd_exec "mkdir -p $dir" "$node" > /dev/null 2>&1
+		phd_node_cp "$script" "$script" "$node" "755" > /dev/null 2>&1
 		phd_cmd_exec "$script" "$node"
 	done
 }
