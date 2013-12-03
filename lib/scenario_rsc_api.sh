@@ -19,7 +19,7 @@ phd_rsc_verify_stop_all()
 
 	stop_time=$(date +%s)
 	phd_cmd_exec "$cmd" "$node"
-	while [ "$?" -ne "0" ]; do
+	while [ "$?" -eq "0" ]; do
 		lapse_sec=`expr $(date +%s) - $stop_time`
 		if [ $lapse_sec -ge $timeout ]; then
 			phd_log LOG_ERR "Timed out waiting for resources to stop"

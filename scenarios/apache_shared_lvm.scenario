@@ -40,7 +40,7 @@ fi
 target=all
 ....
 volume_list=$(echo -n '"' && vgs --noheadings -o vg_name | tr -d ' ' | tr '\n' ',' | sed -e "s/,/\",\"/g" | sed -e "s/\",\"$//g" && echo '"')
-sed -i.bak "s/#volume_list =.*/#volume_list = [ $volume_list ]/g" /etc/lvm/lvm.conf
+sed -i.bak "s/.*[[:space:]]# volume_list =.*/#volume_list = [ $volume_list ]/g" /etc/lvm/lvm.conf
 lvmconf --disable-cluster
 ....
 

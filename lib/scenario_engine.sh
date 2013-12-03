@@ -284,7 +284,7 @@ scenario_environment_defaults()
 
 	# install configs and other environment constants that we
 	# need to be consistent for all scenarios.
-	phd_node_cp "${PHDCONST_ROOT}/lib/lvm.conf.phd_default" "/etc/lvm/lvm.conf" "$nodes" "644"
+	phd_node_cp "${PHDCONST_ROOT}/environment/lvm.conf.phd_default" "/etc/lvm/lvm.conf" "$nodes" "644"
 }
 
 scenario_script_exec()
