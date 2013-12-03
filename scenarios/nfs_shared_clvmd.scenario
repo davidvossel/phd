@@ -44,21 +44,7 @@ pcs -f $tmpfile constraint colocation add clvmd-clone with dlm-clone
 
 pcs cluster cib-push $tmpfile
 
-STOP_TIMEOUT=45
-lapse_sec=0
-stop_time=$(date +%s)
-pidof clvmd
-while [ "$?" -ne "0" ]; do
-	lapse_sec=`expr $(date +%s) - $stop_time`
-	if [ $lapse_sec -ge $STOP_TIMEOUT ]; then
-		echo "Timed out waiting for clvmd to start"
-		exit 1
-	fi
-
-	sleep 1
-	pidof clvmd
-done
-
+phd_wait_pidof "clvmd" 45
 ....
 
 ##

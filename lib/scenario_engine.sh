@@ -24,13 +24,20 @@ scenario_clean_nodes()
 {
 	local nodes=$(definition_nodes)
 	phd_cmd_exec "rm -rf $TMP_DIR" "$nodes"
-	phd_cmd_exec "mkdir -p $TMP_DIR" "$nodes"
+	phd_cmd_exec "mkdir -p $TMP_DIR/lib" "$nodes"
 }
 
 scenario_script_add_env()
 {
 	local script=$1
+	local api_files=$(ls ${PHDCONST_ROOT}/lib/*api*)
 	local tmp
+	local file
+
+	for file in $(echo $api_files); do
+		file=$(basename $file)
+		echo ". ${TMP_DIR}/lib/${file}" >> $script
+	done
 
 	while read tmp; do
 		local key=$(echo $tmp | awk -F= '{print $1}')
@@ -259,6 +266,18 @@ scenario_cluster_init()
 	fi
 }
 
+scenario_distribute_api()
+{
+	local api_files=$(ls ${PHDCONST_ROOT}/lib/*)
+	local nodes=$(definition_nodes)
+	local file
+
+	for file in $(echo $api_files); do
+		file=$(basename $file)
+		phd_node_cp "${PHDCONST_ROOT}/lib/${file}" "${TMP_DIR}/lib/${file}" "$nodes" "755"
+	done
+}
+
 scenario_script_exec()
 {
 	local script_num=0
@@ -349,6 +368,16 @@ scenario_exec()
 	phd_log LOG_NOTICE "==== Package Install ====" 
 	phd_log LOG_NOTICE "=========================" 
 	scenario_package_install
+
+	phd_log LOG_NOTICE "============================" 
+	phd_log LOG_NOTICE "==== Distribute PHD API ====" 
+	phd_log LOG_NOTICE "============================" 
+	scenario_distribute_api
+
+	phd_log LOG_NOTICE "===================================="
+	phd_log LOG_NOTICE "==== Distribute Default Configs ====" 
+	phd_log LOG_NOTICE "====================================" 
+	#TODO create a environment files directory and copy files over to it to all the nodes
 
 	phd_log LOG_NOTICE "==================================" 
 	phd_log LOG_NOTICE "==== Checking Cluster Startup ====" 

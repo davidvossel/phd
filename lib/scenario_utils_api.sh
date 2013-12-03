@@ -44,18 +44,13 @@ phd_cmd_exec()
 {
 	local cmd=$1
 	local nodes=$2
+	local node
 
 	# TODO - support multiple transports
-	phd_ssh_cmd_exec "$cmd" "$nodes"
-}
-
-phd_script_exec()
-{
-	local script=$1
-	local nodes=$2
-
-	# TODO - support multiple transports
-	phd_ssh_script_exec $script "$nodes"
+	for node in $(echo $nodes); do
+		phd_log LOG_DEBUG "executing cmd \"$cmd\" on node \"$node\""		
+		phd_ssh_cmd_exec "$cmd" "$node"
+	done
 }
 
 phd_node_cp()
@@ -63,9 +58,30 @@ phd_node_cp()
 	local src=$1
 	local dest=$2
 	local nodes=$3
+	local permissions=$4
+	local node
 	
 	# TODO - support multiple transports
-	phd_ssh_cp "$src" "$dest" "$nodes"
+	for node in $(echo $nodes); do
+		phd_log LOG_DEBUG "copying file \"$src\" to node \"$node\" destination location \"$dest\""
+		phd_ssh_cp "$src" "$dest" "$node"
+		phd_cmd_exec "chmod 755 $dest" "$node"
+	done
+}
+
+phd_script_exec()
+{
+	local script=$1
+	local dir=$(dirname $script)
+	local nodes=$2
+	local node
+
+	for node in $(echo $nodes); do
+		phd_log LOG_DEBUG "executing script \"$script\" on node \"$node\""		
+		phd_cmd_exec "mkdir -p $dir" "$node"
+		phd_node_cp "$script" "$script" "$node" "755"
+		phd_cmd_exec "$script" "$node"
+	done
 }
 
 phd_exit_failure()
@@ -78,4 +94,30 @@ phd_exit_failure()
 
 	phd_log LOG_ERR "Exiting: $reason"
 	exit 1
+}
+
+phd_wait_pidof()
+{
+	local pidname=$1
+	local timeout=$2
+	local lapse_sec=0
+	local stop_time=0
+
+	if [ -z "$timeout" ]; then
+		timeout=60
+	fi
+
+	stop_time=$(date +%s)
+	pidof $pidname 
+	while [ "$?" -ne "0" ]; do
+		lapse_sec=`expr $(date +%s) - $stop_time`
+		if [ $lapse_sec -ge $timeout ]; then
+			phd_exit_failure "Timed out waiting for $pidname to start"
+		fi
+
+		sleep 1
+		pidof $pidname
+	done
+
+	return 0
 }
