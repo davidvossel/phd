@@ -95,7 +95,7 @@ pacemaker_cluster_init()
 {
 	local nodes=$(definition_nodes)
 
-	phd_cmd_exec "pcs cluster setup --local --name phd-cluster $nodes" "$nodes"
+	phd_cmd_exec "pcs cluster setup --force --local --name phd-cluster $nodes" "$nodes"
 	if [ "$?" -ne 0 ]; then
 		phd_exit_failure "Could not setup corosync config for pacemaker cluster"
 	fi
