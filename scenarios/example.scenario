@@ -58,8 +58,15 @@ pcs resource group add web-group web-site web-ip
 ######################
 = TESTS =
 
+##
+# Test that all the resources are up.
+##
 target=$PHD_ENV_nodes1
 ....
 phd_rsc_verify_start_all
 phd_assert $? 0 "Failed to start all resources"
+
+phd_rsc_relocate web-group
+phd_assert $? 0 "Failed to relocate web-group"
+
 ....

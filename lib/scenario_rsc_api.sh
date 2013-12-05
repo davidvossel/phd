@@ -28,6 +28,30 @@ phd_rsc_active_nodes()
 	phd_cmd_exec "$cmd" "$node"
 }
 
+
+phd_rsc_verify_is_active()
+{
+	local rsc=$1
+	local timeout=$2
+	local node=$3
+	local lapse_sec=0
+	local stop_time=0
+
+	stop_time=$(date +%s)
+	active_list=$(phd_rsc_active_nodes "$rsc" "$node")
+	while [ -z "$active_list" ]; do
+		lapse_sec=`expr $(date +%s) - $stop_time`
+		if [ $lapse_sec -ge $timeout ]; then
+			phd_log LOG_ERR "Timed out waiting for resource ($rsc) to become active on ($active_node)"
+			return 1
+		fi
+		sleep 1
+		active_list=$(phd_rsc_active_nodes "$rsc" "$node")
+	done
+
+	return 0
+}
+
 # returns if rsc is active on a node or not.
 # 0 active
 # 1 not active
@@ -35,16 +59,52 @@ phd_rsc_verify_is_active_on()
 {
 	local rsc=$1
 	local active_node=$2
-	local node=$3
-	local active_list=$(phd_rsc_active_nodes "$rsc" "$node")
+	local timeout=$3
+	local node=$4
+	local lapse_sec=0
+	local stop_time=0
 
-	echo "$active_list" | grep -q "$active_node"
-	# TODO externally verify rsc is running on the node as well
-	#for active_node in $(echo $active_list); do
-		# 
-	#done
+	stop_time=$(date +%s)
+	echo $(phd_rsc_active_nodes "$rsc" "$node") | grep -q "$active_node"
+	while [ $? -ne 0 ]; do
+		lapse_sec=`expr $(date +%s) - $stop_time`
+		if [ $lapse_sec -ge $timeout ]; then
+			phd_log LOG_ERR "Timed out waiting for resource ($rsc) to become active on ($active_node)"
+			return 1
+		fi
+		sleep 1
+		echo $(phd_rsc_active_nodes "$rsc" "$node") | grep -q "$active_node"
+	done
 
-	return $?
+	return 0
+}
+
+
+# returns if rsc is stopped on a node or not.
+# 0 active
+# 1 not active
+phd_rsc_verify_is_stopped_on()
+{
+	local rsc=$1
+	local active_node=$2
+	local timeout=$3
+	local node=$4
+	local lapse_sec=0
+	local stop_time=0
+
+	stop_time=$(date +%s)
+	echo $(phd_rsc_active_nodes "$rsc" "$node") | grep -q "$active_node"
+	while [ $? -eq 0 ]; do
+		lapse_sec=`expr $(date +%s) - $stop_time`
+		if [ $lapse_sec -ge $timeout ]; then
+			phd_log LOG_ERR "Timed out waiting for resource ($rsc) to become stop on ($active_node)"
+			return 1
+		fi
+		sleep 1
+		echo $(phd_rsc_active_nodes "$rsc" "$node") | grep -q "$active_node"
+	done
+
+	return 0
 }
 
 
@@ -142,5 +202,41 @@ phd_rsc_stop_all()
 	for rsc in $(echo $rsc_list); do
 		phd_cmd_exec "pcs resource disable $rsc" "$node"
 	done
+}
+
+phd_rsc_relocate()
+{
+	local rsc=$1
+	local node=$2
+	local cur_node=$(phd_rsc_active_nodes $rsc $node)
+
+	if [ -z "$rsc" ]; then
+		return 1
+	fi
+
+	cur_node=$(echo $cur_node | awk '{print $1}')
+	if [ -z "$cur_node" ]; then
+		return 1
+	fi
+	
+	phd_cmd_exec "pcs resource defaults | grep resource-stickiness" "$node"
+	if [ $? -ne 0 ]; then
+		phd_cmd_exec "pcs resource defaults resource-stickiness=100" "$node"
+	fi
+
+	phd_log LOG_DEBUG "Moving $rsc away from node $cur_node"
+	phd_cmd_exec "pcs resource move $rsc" "$node"
+	phd_rsc_verify_is_stopped_on "$rsc" "$cur_node" 60 "$node"
+	if [ $? -ne 0 ]; then
+		return 1
+	fi
+	# verify it is active anywhere, we don't care where
+	phd_rsc_verify_is_active "$rsc" 60 "$node"
+	if [ $? -ne 0 ]; then
+		return 1
+	fi
+	phd_cmd_exec "pcs resource clear $rsc" "$node"
+	phd_log LOG_NOTICE "Resource $rsc successfully relocated from node $cur_node to node $(phd_rsc_active_nodes $rsc $node)"
+	return 0
 }
 
