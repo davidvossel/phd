@@ -37,6 +37,8 @@ scenario_script_add_env()
 	for file in $(echo $api_files); do
 		file=$(basename $file)
 		echo ". ${TMP_DIR}/lib/${file}" >> $script
+		echo "export PHDCONST_ROOT=\"${TMP_DIR}\"" >> $script
+
 	done
 
 	while read tmp; do
