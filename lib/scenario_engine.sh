@@ -306,6 +306,10 @@ scenario_script_exec()
 		fi
 
 		expected_rc=$(eval echo "\$${SENV_PREFIX}_require_exitcode${script_num}")
+		if [ -z "$expected_rc" ]; then
+			expected_rc=0
+		fi
+
 		nodes=$(eval echo "\$${SENV_PREFIX}_target${script_num}")
 		if [ -z "$nodes" ]; then
 			nodes=$(definition_nodes)
@@ -320,9 +324,6 @@ scenario_script_exec()
 		for node in $(echo $nodes); do
 			phd_script_exec $script "$node"
 			rc=$?
-			if [ -z "$expected_rc" ]; then
-				continue
-			fi
 			if [ "$expected_rc" -ne "$rc" ]; then
 				phd_exit_failure "Script $script_num exit code is $rc, expected $expected_rc Exiting."
 			fi

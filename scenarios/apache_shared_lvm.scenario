@@ -48,7 +48,6 @@ lvmconf --disable-cluster
 # Create logical volume for web data
 ##
 target=$PHD_ENV_nodes1
-require_exitcode=0
 ....
 pvcreate $PHD_ENV_shared_storage1
 vgcreate cluster_vg $PHD_ENV_shared_storage1

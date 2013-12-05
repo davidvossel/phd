@@ -14,7 +14,6 @@ cluster_init=1
 = SCRIPTS =
 
 target=all
-require_exitcode=0
 ....
 systemctl stop slapd
 sleep 1

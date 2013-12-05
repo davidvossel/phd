@@ -28,8 +28,10 @@ systemctl disable nfs-lock
 systemctl stop nfs-lock
 ....
 
+##
+# setup clvmd and dlm for clustered lvm management
+##
 target=$PHD_ENV_nodes1
-require_exitcode=0
 ....
 tmpfile=mktemp
 
@@ -51,7 +53,6 @@ phd_wait_pidof "clvmd" 45
 # Make the cluster storage volume group
 ##
 target=$PHD_ENV_nodes1
-require_exitcode=0
 ....
 dev=$PHD_ENV_shared_storage1
 
@@ -70,7 +71,6 @@ vgchange -an cluster_vg
 # Make the lvm resources and floating ip
 ##
 target=$PHD_ENV_nodes1
-require_exitcode=0
 ....
 pcs cluster cib lvm-ext4.cib
 pcs -f lvm-ext4.cib resource create cluster_vg LVM volgrpname=cluster_vg exclusive=true
@@ -103,7 +103,6 @@ done
 # NFS share setup
 ##
 target=$PHD_ENV_nodes1
-require_exitcode=0
 ....
 suffix=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
 
@@ -115,9 +114,4 @@ pcs -f nfs-rsc.cib resource create nfs-daemon nfsserver nfs_shared_infodir=/nfss
 pcs -f nfs-rsc.cib resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync directory=/nfsshare/clientdata fsid=0
 pcs -f nfs-rsc.cib resource group add nfs-group nfs-daemon nfs-export
 pcs cluster cib-push nfs-rsc.cib
-
-phd_rsc_verify_start_all 60
 ....
-
-
-

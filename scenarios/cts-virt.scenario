@@ -19,7 +19,6 @@ cluster_destroy=1
 # Verify the node driving this scenario is outside of the cluster
 ##
 target=local
-require_exitcode=0
 ....
 local nodename = $(crm_node -n)
 for node in $(echo $PHD_ENV_nodes); do
@@ -42,13 +41,13 @@ systemctl disable pacemaker
 systemctl disable corosync
 chkconfig pacemaker off
 chkconfig corosync off
+exit 0
 ....
 
 ##
 # determine if fence_xvm is setup on all nodes
 ##
 target=all
-require_exitcode=0
 ....
 echo "Checking to make sure fence_xvm has a valid key on cluster nodes"
 ls /etc/cluster/fence_xvm.key
@@ -58,7 +57,6 @@ ls /etc/cluster/fence_xvm.key
 # determine if fence_virtd is reachable from all nodes
 ##
 target=all
-require_exitcode=0
 ....
 echo "Checking to make sure fence_xvm is reachable"
 fence_xvm -o list
@@ -68,7 +66,6 @@ fence_xvm -o list
 # Launch CTS
 ##
 target=local
-require_exitcode=0
 ....
 stack="mcp"
 yum list installed | grep cman
