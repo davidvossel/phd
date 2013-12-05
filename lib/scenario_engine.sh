@@ -354,6 +354,7 @@ scenario_verify()
 	if [ $res -ne 0 ]; then
 		phd_exit_failure "Cluster defintion does not meet all of the scenarios requirements"
 	fi
+	phd_log LOG_NOTICE "Success: cluster definition passes scenario validation"
 }
 
 scenario_exec()

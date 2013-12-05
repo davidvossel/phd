@@ -116,6 +116,7 @@ pcs -f nfs-rsc.cib resource create nfs-export exportfs clientspec=${suffix}/255.
 pcs -f nfs-rsc.cib resource group add nfs-group nfs-daemon nfs-export
 pcs cluster cib-push nfs-rsc.cib
 
+phd_rsc_verify_start_all 60
 ....
 
 

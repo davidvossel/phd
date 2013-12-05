@@ -45,16 +45,22 @@ phd_cmd_exec()
 	local cmd=$1
 	local nodes=$2
 	local node
+	local rc=1
 
 	# execute locally if no nodes are given
 	if [ -z "$nodes" ]; then
-		$cmd
+		eval $cmd
 		return $?
 	fi
 	# TODO - support multiple transports
 	for node in $(echo $nodes); do
 		phd_ssh_cmd_exec "$cmd" "$node"
+		rc=$?
+		if [ $rc -eq 137 ]; then
+			phd_exit_failure "Timed out waiting for cmd ($cmd) to execute on node $node"
+		fi
 	done
+	return $rc
 }
 
 phd_node_cp()

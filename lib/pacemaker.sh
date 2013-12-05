@@ -43,7 +43,7 @@ pacemaker_cluster_stop()
 		# everywhere
 		if [ $rsc_stopped -eq 0 ]; then
 			phd_rsc_stop_all "$node"
-			phd_rsc_verify_stop_all "$node"
+			phd_rsc_verify_stop_all 120 "$node"
 			if [ $? -eq 0 ]; then
 				rsc_stopped=1
 			fi
