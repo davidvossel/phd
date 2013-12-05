@@ -108,6 +108,13 @@ phd_exit_failure()
 	exit 1
 }
 
+phd_assert()
+{
+	if [ $1 -ne $2 ]; then
+		phd_exit_failure "unexpected exit code $1, $3"
+	fi	
+}
+
 phd_wait_pidof()
 {
 	local pidname=$1

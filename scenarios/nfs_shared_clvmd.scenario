@@ -115,3 +115,14 @@ pcs -f nfs-rsc.cib resource create nfs-export exportfs clientspec=${suffix}/255.
 pcs -f nfs-rsc.cib resource group add nfs-group nfs-daemon nfs-export
 pcs cluster cib-push nfs-rsc.cib
 ....
+
+######################
+#    Test Scripts    #
+######################
+= TESTS =
+
+target=$PHD_ENV_nodes1
+....
+phd_rsc_verify_start_all
+phd_assert $? 0 "Failed to start all resources"
+....

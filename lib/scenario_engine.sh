@@ -12,6 +12,9 @@ TMP_DIR="/var/run/phd_scenario"
 SEC_REQ="REQUIREMENTS"
 SEC_LOCAL="LOCAL_VARIABLES"
 SEC_SCRIPTS="SCRIPTS"
+SEC_TESTS="TESTS"
+
+TEST_INDEX=0
 
 scenario_clean()
 {
@@ -77,7 +80,7 @@ scenario_unpack()
 		fi
 
 		case $cleaned in
-		$SEC_REQ|$SEC_LOCAL|$SEC_SCRIPTS)
+		$SEC_REQ|$SEC_LOCAL|$SEC_SCRIPTS|$SEC_TESTS)
 			section=$cleaned
 			continue ;;
 		*) : ;;
@@ -90,6 +93,11 @@ scenario_unpack()
 		$SEC_LOCAL)
 			export "${SENV_PREFIX}_$cleaned"
 			continue ;;
+		$SEC_TESTS)
+			# this is the script index that separates
+			# the deployment from the tests
+			TEST_INDEX=$script_num
+		;;
 		$SEC_SCRIPTS) : ;;
 		*) : ;;
 		esac
@@ -291,15 +299,22 @@ scenario_environment_defaults()
 
 scenario_script_exec()
 {
-	local script_num=0
+	local execute_tests=$1
+	local script_num=1
 	local script=""
 	local nodes=""
 	local node=""
 	local rc=0
 	local expected_rc=0
 
+	if [ $execute_tests -eq 1 ]; then
+		script_num=$TEST_INDEX
+		if [ $script_num -eq 0 ]; then
+			return 0
+		fi
+	fi
+
 	while true; do
-		script_num=$(($script_num + 1))
 		script=$(eval echo "\$${SCRIPT_PREFIX}_${script_num}")
 		if [ -z "$script" ]; then
 			break
@@ -328,6 +343,13 @@ scenario_script_exec()
 				phd_exit_failure "Script $script_num exit code is $rc, expected $expected_rc Exiting."
 			fi
 		done
+		script_num=$(($script_num + 1))
+
+		if [ $execute_tests -eq 0 ]; then
+			if [ $script_num -eq $TEST_INDEX ]; then
+				break
+			fi
+		fi
 	done
 
 	return 0
@@ -364,7 +386,6 @@ scenario_exec()
 	phd_log LOG_NOTICE "==== Verifying Scenario against Cluster Definition ====" 
 	phd_log LOG_NOTICE "=======================================================" 
 	scenario_verify
-
 	scenario_clean_nodes
 
 	phd_log LOG_NOTICE "====================================" 
@@ -397,12 +418,25 @@ scenario_exec()
 	phd_log LOG_NOTICE "==================================" 
 	scenario_cluster_init
 
-	phd_log LOG_NOTICE "====================================" 
-	phd_log LOG_NOTICE "==== Executing Scenario Scripts ====" 
-	phd_log LOG_NOTICE "====================================" 
-	scenario_script_exec
+	phd_log LOG_NOTICE "======================================" 
+	phd_log LOG_NOTICE "==== Executing Deployment Scripts ====" 
+	phd_log LOG_NOTICE "======================================" 
+	scenario_script_exec 0
 
 	phd_log LOG_NOTICE "====================================" 
-	phd_log LOG_NOTICE "====           DONE             ====" 
+	phd_log LOG_NOTICE "====  Deployment Complete       ====" 
 	phd_log LOG_NOTICE "====================================" 
+}
+
+scenario_exec_tests()
+{
+	phd_log LOG_NOTICE "=================================" 
+	phd_log LOG_NOTICE "==== Executing Test Scripts  ====" 
+	phd_log LOG_NOTICE "=================================" 
+
+	scenario_script_exec 1
+
+	phd_log LOG_NOTICE "===========================" 
+	phd_log LOG_NOTICE "==== All tests Passed  ====" 
+	phd_log LOG_NOTICE "===========================" 
 }

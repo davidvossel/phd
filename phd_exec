@@ -24,8 +24,9 @@ function helptext() {
 	echo "The scenario file on the given cluster definition"
 	echo ""
 	echo "Options"
-	echo "-p, --print-env	Print cluster definition environment variables"
-	echo "-c, --check	    Verify cluster definition can run the scenario file"
+	echo "-p, --print-env          Print cluster definition environment variables"
+	echo "-c, --verify-definition  Verify cluster definition can run the scenario file"
+	echo "-t, --run-tests          Run scenario tests after deployment"
 	echo ""
 	exit $1
 }
@@ -43,11 +44,13 @@ fi
 
 print_env=0
 check_only=0
+tests=0
 while true ; do
 	case "$1" in
 	--help|-h|-\?) helptext 0;;
 	-p|--print-env) print_env=1; shift;;
-	-c|--check)     check_only=1; shift;;
+	-c|--verify)     check_only=1; shift;;
+	-t|--run-tests)  tests=1; shift;;
 	"") break;;
 	*) helptext 1;;
 	esac
@@ -69,3 +72,7 @@ if [ $check_only -eq 1 ]; then
 fi
 
 scenario_exec
+
+if [ $tests -eq 1 ]; then
+	scenario_exec_tests
+fi

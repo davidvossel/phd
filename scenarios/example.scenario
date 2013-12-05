@@ -53,3 +53,13 @@ pcs resource create web-ip ocf:heartbeat:IPaddr2 ip=$PHD_ENV_floating_ips1
 pcs resource group add web-group web-site web-ip
 ....
 
+######################
+#    Test Scripts    #
+######################
+= TESTS =
+
+target=$PHD_ENV_nodes1
+....
+phd_rsc_verify_start_all
+phd_assert $? 0 "Failed to start all resources"
+....
