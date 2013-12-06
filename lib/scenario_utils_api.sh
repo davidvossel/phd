@@ -108,9 +108,12 @@ phd_exit_failure()
 	exit 1
 }
 
-phd_assert()
+phd_test_assert()
 {
 	if [ $1 -ne $2 ]; then
+		phd_log LOG_NOTICE "========================="
+		phd_log LOG_NOTICE "====== TEST FAILURE ====="
+		phd_log LOG_NOTICE "========================="
 		phd_exit_failure "unexpected exit code $1, $3"
 	fi	
 }

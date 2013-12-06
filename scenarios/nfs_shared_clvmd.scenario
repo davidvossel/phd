@@ -36,6 +36,7 @@ target=$PHD_ENV_nodes1
 tmpfile=mktemp
 
 pcs property set stonith-enabled=false
+pcs resource defaults resource-stickiness=100
 
 pcs cluster cib $tmpfile
 
@@ -79,23 +80,10 @@ pcs -f lvm-ext4.cib resource create nfs_ip IPaddr2 ip=$PHD_ENV_floating_ips1 cid
 pcs -f lvm-ext4.cib resource group add nfs-group cluster_vg nfsshare nfs_ip
 pcs -f lvm-ext4.cib constraint order start clvmd-clone then nfs-group
 pcs -f lvm-ext4.cib constraint colocation add nfs-group with clvmd-clone
-# put the nfs group on a node we can predict
+# put the nfs group on a node we can predict,
+# this just helps automate NFS share setup, but will be removed later.
 pcs -f lvm-ext4.cib constraint location nfs-group prefers $PHD_ENV_nodes1
 pcs cluster cib-push lvm-ext4.cib
-
-STOP_TIMEOUT=45
-lapse_sec=0
-stop_time=$(date +%s)
-cat /proc/mounts | grep nfsshare
-while [ "$?" -ne "0" ]; do
-	lapse_sec=`expr $(date +%s) - $stop_time`
-	if [ $lapse_sec -ge $STOP_TIMEOUT ]; then
-		echo "Timed out waiting for nfsshare to mount"
-		exit 1
-	fi
-	sleep 1
-	cat /proc/mounts | grep nfsshare
-done
 ....
 
 
@@ -106,13 +94,22 @@ target=$PHD_ENV_nodes1
 ....
 suffix=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
 
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+
+# Now that our mounts are up, setup the client folders
 mkdir /nfsshare/clientdata
 touch /nfsshare/clientdata/clientsharefile
+
+# Remove that temporary location constraint now that the folders
+# are initialized on the shared storage mount
+pcs constraint location remove location-nfs-group-${PHD_ENV_nodes1}-INFINITY
 
 pcs cluster cib nfs-rsc.cib
 pcs -f nfs-rsc.cib resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo nfs_ip=$PHD_ENV_floating_ips1
 pcs -f nfs-rsc.cib resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync directory=/nfsshare/clientdata fsid=0
 pcs -f nfs-rsc.cib resource group add nfs-group nfs-daemon nfs-export
+
 pcs cluster cib-push nfs-rsc.cib
 ....
 
@@ -123,6 +120,27 @@ pcs cluster cib-push nfs-rsc.cib
 
 target=$PHD_ENV_nodes1
 ....
-phd_rsc_verify_start_all
-phd_assert $? 0 "Failed to start all resources"
+# Verify all resources have started.
+phd_rsc_verify_start_all 60
+phd_test_assert $? 0 "Failed to start all resources"
+
+# Verify all resources can stop and start
+phd_rsc_stop_all
+phd_test_assert $? 0 "Failed to disable resources"
+phd_rsc_verify_stop_all 60
+phd_test_assert $? 0 "Failed to verify all resources stopped"
+phd_rsc_start_all
+phd_test_assert $? 0 "Failed to enable all resources"
+phd_rsc_verify_start_all 60
+phd_test_assert $? 0 "Failed to restart all resources"
+
+# Verify nfs-group can relocate
+phd_rsc_relocate nfs-group 60
+phd_test_assert $? 0 "Failed to relocate nfs-group"
+
+# Verify nfs-daemon can recover after failure
+phd_rsc_verify_start_all 60
+phd_test_assert $? 0 "Failed to verify all resources are started before performing recovery test."
+phd_rsc_failure_recovery nfs-daemon 60
+phd_test_assert $? 0 "Failed to recover nfs-daemon after failure"
 ....

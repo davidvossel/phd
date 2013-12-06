@@ -423,9 +423,9 @@ scenario_exec()
 	phd_log LOG_NOTICE "======================================" 
 	scenario_script_exec 0
 
-	phd_log LOG_NOTICE "====================================" 
-	phd_log LOG_NOTICE "====  Deployment Complete       ====" 
-	phd_log LOG_NOTICE "====================================" 
+	phd_log LOG_NOTICE "==============================" 
+	phd_log LOG_NOTICE "==== Deployment Complete  ====" 
+	phd_log LOG_NOTICE "==============================" 
 }
 
 scenario_exec_tests()

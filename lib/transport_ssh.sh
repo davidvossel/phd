@@ -9,7 +9,7 @@ phd_ssh_cp()
 	local node=$3
 	local fullcmd="scp -o ConnectTimeout=30 -o BatchMode=yes  $src $node:${dest}"
 
-	timeout -s kill 60 $fullcmd
+	timeout -s kill 120 $fullcmd
 }
 
 phd_ssh_cmd_exec()
@@ -18,7 +18,7 @@ phd_ssh_cmd_exec()
 	local node=$2
 	local fullcmd="ssh -o ConnectTimeout=30 -o BatchMode=yes -l root $node $cmd"
 
-	timeout -s KILL 60 $fullcmd
+	timeout -s KILL 120 $fullcmd
 }
 
 #phd_ssh_connection_verify()

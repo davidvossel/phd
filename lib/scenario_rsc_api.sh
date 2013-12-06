@@ -39,7 +39,7 @@ phd_rsc_active_nodes()
 {
 	local rsc=$1
 	local node=$2
-	local cmd="crm_resource -W -r $rsc 2>&1 | sed 's/.*on: //g' | sed 's/.*is NOT running.*//g' | sed 's/.*No such device.*//g' | tr -d '\n'"
+	local cmd="crm_resource -W -r $rsc 2>&1 | sed 's/.*on: / /g' | sed 's/.*is NOT running.*//g' | sed 's/.*No such device.*//g' | tr -d '\n'"
 
 	phd_cmd_exec "$cmd" "$node"
 }
@@ -67,7 +67,7 @@ phd_rsc_verify_is_active()
 	while [ -z "$active_list" ]; do
 		lapse_sec=`expr $(date +%s) - $stop_time`
 		if [ $lapse_sec -ge $timeout ]; then
-			phd_log LOG_ERR "Timed out waiting for resource ($rsc) to become active on ($active_node)"
+			phd_log LOG_DEBUG "Timed out waiting for resource ($rsc) to become active within the cluster"
 			return 1
 		fi
 		sleep 1
@@ -277,7 +277,7 @@ phd_rsc_start_all()
 		return 1
 	fi
 
-	phd_log LOG_DEBUG "starting all resources. $rsc_list on node $node"
+	phd_log LOG_DEBUG "enabling all resources. $rsc_list"
 	for rsc in $(echo $rsc_list); do
 		phd_cmd_exec "pcs resource enable $rsc" "$node"
 	done
@@ -328,6 +328,79 @@ phd_rsc_relocate()
 	fi
 	phd_cmd_exec "pcs resource clear $rsc" "$node"
 	phd_log LOG_NOTICE "Resource $rsc successfully relocated from node $cur_node to node $(phd_rsc_active_nodes $rsc $node)"
+	return 0
+}
+
+##
+# Fails a resource on a specific node
+#
+# Usage: phd_rsc_fail <rsc id> <node to fail on> [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return value:
+# 0 success
+# non-zero failure
+##
+phd_rsc_fail()
+{
+	local rsc=$1
+	local fail_node=$2
+	local node=$3
+
+	# TODO add non generic ways to fail resource
+
+	phd_cmd_exec "crm_resource -F -r $rsc -N $fail_node" "$node"
+}
+
+##
+# Fail a resource and verify it recovers
+##
+phd_rsc_failure_recovery()
+{
+	local rsc=$1
+	local timeout=$2
+	local node=$3
+	local cur_node=$(phd_rsc_active_nodes $rsc $node)
+	local lapse_sec=0
+	local stop_time=0
+
+	if [ -z "$rsc" ]; then
+		return 1
+	fi
+
+	# If there are more than one nodes returned. this will get the first entry.
+	cur_node=$(echo $cur_node | awk '{print $1}')
+	if [ -z "$cur_node" ]; then
+		phd_log LOG_ERR "Resource $rsc is not active anywhere to test failure recovery"
+		return 1
+	fi
+
+	# clear failcount
+	phd_cmd_exec "pcs resource failcount reset $rsc $cur_node"
+
+	# fail rsc
+	phd_rsc_fail "$rsc" "$cur_node" "$node"
+
+	# verify failcount increases
+	stop_time=$(date +%s)
+	phd_cmd_exec "pcs resource failcount show $rsc $cur_node | grep '$cur_node:.*[1-9]*'"
+	while [ $? -ne 0 ]; do
+		lapse_sec=`expr $(date +%s) - $stop_time`
+		if [ $lapse_sec -ge $timeout ]; then
+			phd_log LOG_ERR "Timed out waiting for resource ($rsc) to fail on node ($cur_node)"
+			return 1
+		fi
+		sleep 1
+		phd_cmd_exec "pcs resource failcount show $rsc $cur_node | grep '$cur_node:.*[1-9]*'"
+	done
+
+	# verify rsc is active on that node again (shows resource recovered)
+	phd_rsc_verify_is_active_on "$rsc" "$cur_node" $timeout "$node"
+	if [ $? -ne 0 ]; then
+		phd_log LOG_ERR "Resource $rsc never recovered after failure on node $cur_node"
+		return 1
+	fi
+
 	return 0
 }
 
