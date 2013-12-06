@@ -58,7 +58,7 @@ phd_log()
 	esac
 
 	if [ $level -le $STDOUT_LOG_LEVEL ]; then
-		echo "$priority: $(basename ${BASH_SOURCE[1]})[$$]: ${FUNCNAME[1]}(): ${BASH_LINENO}: $msg"
+		echo "$priority: $(basename ${BASH_SOURCE[1]})[$$]: ${FUNCNAME[1]}(): ${BASH_LINENO} - $msg"
 	fi
 }
 
@@ -97,10 +97,16 @@ phd_node_cp()
 	for node in $(echo $nodes); do
 		phd_log LOG_DEBUG "copying file \"$src\" to node \"$node\" destination location \"$dest\""
 		phd_ssh_cp "$src" "$dest" "$node"
+		if [ $? -ne 0 ]; then
+			phd_log LOG_ERR "failed to copy file \"$src\" to node \"$node\" destination location \"$dest\""
+			return 1
+		fi
 		if [ -n "$permissions" ]; then
 			phd_cmd_exec "chmod $permissions $dest" "$node"
 		fi
 	done
+
+	return 0
 }
 
 phd_script_exec()

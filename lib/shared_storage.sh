@@ -10,6 +10,8 @@ shared_storage_destroy()
 	local wipe_script="$TMP_DIR/PHD_STORAGE_WIPE"
 	local shared_dev=$(definition_shared_dev)
 
+	phd_log LOG_NOTICE "Wiping shared storage device[s] ($shared_dev)"
+
 	cat <<- END > $corosync_start
 #!/bin/sh
 

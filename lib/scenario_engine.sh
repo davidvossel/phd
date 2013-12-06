@@ -174,11 +174,11 @@ scenario_custom_package_install()
 
 	for node in $(echo $nodes); do
 		phd_log LOG_DEBUG "Installing custom packages '$packages' on node '$node'"
-		phd_cmd_exec "yum remove -y $packages" "$node"
+		phd_cmd_exec "yum remove -y $packages >/dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Could not clean custom packages on \"$node\" before install"
 		fi
-	    phd_cmd_exec "yum install -y $TMP_DIR/phd_rpms/*.rpm" "$node"
+	    phd_cmd_exec "yum install -y $TMP_DIR/phd_rpms/*.rpm > /dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Could not install custom packages on \"$node\""
 		fi
@@ -202,23 +202,27 @@ scenario_package_install()
     local unique=$(echo "$packages $custom_packages" | sed 's/\s/\n/g' | sort | uniq -u)
 	packages=$(echo "$packages $unique" | sed 's/\s/\n/g' | sort | uniq -d | tr '\n' ' ')
 	if [ -z "$packages" ]; then
+		phd_log LOG_NOTICE "Success: no package install required."
 		return 0
 	fi
 
 	for node in $(scenario_install_nodes); do
 		phd_log LOG_DEBUG "Installing packages \"$packages\" on node \"$node\""
-		phd_cmd_exec "yum install -y $packages" "$node"
+		phd_cmd_exec "yum install -y $packages > /dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Could not install required packages on node \"$node\""
 		fi
 
+		# sanity check that everything actually worked
 		for package in $(echo $packages); do
-			phd_cmd_exec "yum list installed | grep $package > /dev/null 2>&1" "$node"
+			phd_cmd_exec "yum list installed 2>&1 | grep -q '$package'" "$node"
 			if [ $? -ne 0 ]; then
 				phd_exit_failure "Could not install required package \"$package\" on node \"$node\""
 			fi
 		done
 	done
+
+	phd_log LOG_NOTICE "Success: Packages installed"
 
 	return 0
 }
@@ -229,10 +233,12 @@ scenario_storage_destroy()
 	local shared_dev=$(definition_shared_dev)
 
 	if [ -z "$wipe" ]; then
+		phd_log LOG_NOTICE "Success: Skipping."
 		return
 	fi
 
 	if [ "$wipe" -ne 1 ]; then
+		phd_log LOG_NOTICE "Success: Skipping."
 		return
 	fi
 
@@ -241,6 +247,7 @@ scenario_storage_destroy()
 	fi
 	
 	shared_storage_destroy
+	phd_log LOG_NOTICE "Success: Shared storage wiped"
 }
 
 scenario_cluster_destroy()
@@ -259,6 +266,9 @@ scenario_cluster_destroy()
 	if [ "$destroy" -eq "1" ]; then
 		pacemaker_cluster_stop
 		pacemaker_cluster_clean
+		phd_log LOG_NOTICE "Success: Cluster destroyed"
+	else 
+		phd_log LOG_NOTICE "Success: Skipping cluster destroy"
 	fi
 }
 
@@ -273,6 +283,10 @@ scenario_cluster_init()
 	if [ "$cluster_init" -eq "1" ]; then
 		pacemaker_cluster_init
 		pacemaker_cluster_start
+		phd_log LOG_NOTICE "Success: Cluster started"
+	else 
+		phd_log LOG_NOTICE "Success: Skipping cluster start"
+
 	fi
 }
 
@@ -285,7 +299,11 @@ scenario_distribute_api()
 	for file in $(echo $api_files); do
 		file=$(basename $file)
 		phd_node_cp "${PHDCONST_ROOT}/lib/${file}" "${TMP_DIR}/lib/${file}" "$nodes" "755"
+		if [ $? -ne 0 ]; then
+			phd_exit_failure "Failed to distribute phd API to nodes. Exiting."
+		fi
 	done
+	phd_log LOG_NOTICE "Success: API distributed to nodes ($nodes)"
 }
 
 scenario_environment_defaults()
@@ -295,6 +313,10 @@ scenario_environment_defaults()
 	# install configs and other environment constants that we
 	# need to be consistent for all scenarios.
 	phd_node_cp "${PHDCONST_ROOT}/environment/lvm.conf.phd_default" "/etc/lvm/lvm.conf" "$nodes" "644"
+	if [ $? -ne 0 ]; then
+		phd_exit_failure "Failed to distribute default configuration files."
+	fi
+	phd_log LOG_NOTICE "Success: Default configs distributed"
 }
 
 scenario_script_exec()
@@ -422,10 +444,7 @@ scenario_exec()
 	phd_log LOG_NOTICE "==== Executing Deployment Scripts ====" 
 	phd_log LOG_NOTICE "======================================" 
 	scenario_script_exec 0
-
-	phd_log LOG_NOTICE "==============================" 
-	phd_log LOG_NOTICE "==== Deployment Complete  ====" 
-	phd_log LOG_NOTICE "==============================" 
+	phd_log LOG_NOTICE "Success: Deployment Complete" 
 }
 
 scenario_exec_tests()
@@ -436,7 +455,5 @@ scenario_exec_tests()
 
 	scenario_script_exec 1
 
-	phd_log LOG_NOTICE "===========================" 
-	phd_log LOG_NOTICE "==== All tests Passed  ====" 
-	phd_log LOG_NOTICE "===========================" 
+	phd_log LOG_NOTICE "Success: All tests Passed" 
 }

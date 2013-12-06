@@ -17,21 +17,22 @@ pacemaker_cluster_stop()
 	local rsc_stopped=0
 
 	for node in $(echo $nodes); do
-		phd_cmd_exec "yum list installed | grep pacemaker > /dev/null 2>&1" "$node"
+		phd_cmd_exec "yum list installed 2>&1 | grep -q 'pacemaker'" "$node"
 		if [ $? -ne 0 ]; then
 			continue
 		fi
-		phd_cmd_exec "yum list installed | grep pcs > /dev/null 2>&1" "$node"
+		phd_cmd_exec "yum list installed 2>&1 | grep 'grep pcs'" "$node"
 		if [ $? -ne 0 ]; then
-			phd_cmd_exec "yum install -y pcs" "$node"
+			phd_cmd_exec "yum install -y pcs > /dev/null 2>&1" "$node"
 		fi
 
 		# if pacemaker is down, still execut pcs stop to make
 		# sure corosync is down
-		phd_cmd_exec "pcs cluster status" "$node" > /dev/null 2>&1
+		phd_cmd_exec "pcs cluster status > /dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
-			phd_cmd_exec "pcs cluster stop" "$node" > /dev/null 2>&1
-			phd_cmd_exec "service corosync stop" "$node" > /dev/null 2>&1
+			phd_log LOG_INFO "Pacemaker already stopped on node $node"
+			phd_cmd_exec "pcs cluster stop > /dev/null 2>&1" "$node"
+			phd_cmd_exec "service corosync stop > /dev/null 2>&1" "$node"
 			pacemaker_kill_processes $node
 			continue
 		fi
@@ -42,6 +43,7 @@ pacemaker_cluster_stop()
 		# if we start killing off nodes before clvmd stopped
 		# everywhere
 		if [ $rsc_stopped -eq 0 ]; then
+			phd_log LOG_INFO "Stopping all resources in cluster before destroying cluster"
 			phd_rsc_stop_all "$node"
 			phd_rsc_verify_stop_all 120 "$node"
 			if [ $? -eq 0 ]; then
@@ -49,12 +51,13 @@ pacemaker_cluster_stop()
 			fi
 		fi
 
-		phd_cmd_exec "pcs cluster stop" "$node" > /dev/null 2>&1
+		phd_log LOG_INFO "Stopping pacemaker on node $node"
+		phd_cmd_exec "pcs cluster stop > /dev/null 2>&1" "$node"
 		if [ "$?" -eq 0 ]; then
-			phd_cmd_exec "service corosync stop" "$node" > /dev/null 2>&1
+			phd_cmd_exec "service corosync stop > /dev/null 2>&1" "$node"
 		else
 			phd_log LOG_ERR "Could not gracefully stop pacemaker on node $node"
-			phd_log LOG_DEBUG "Force stopping $node"
+			phd_log LOG_INFO "Force stopping $node"
 		fi
 		# always cleanup processes
 		pacemaker_kill_processes $node
@@ -67,7 +70,8 @@ pacemaker_cluster_start()
 	local node
 
 	for node in $(echo $nodes); do
-		phd_cmd_exec "pcs cluster start" "$node"
+		phd_log LOG_NOTICE "Starting cluster stack on node $node"
+		phd_cmd_exec "pcs cluster start > /dev/null 2>&1" "$node"
 		if [ "$?" -ne 0 ]; then
 			phd_exit_failure "Could not start pacemaker on node $node"
 		fi
@@ -76,11 +80,13 @@ pacemaker_cluster_start()
 	node=$(definition_node "1")
 
 	while true; do
-		phd_log LOG_DEBUG "Attempting to determine if pacemaker cluster is up."
+		# TODO time this out
+		phd_log LOG_INFO "Waiting for pacemaker cluster to come up."
 		phd_cmd_exec "cibadmin -Q > /dev/null 2>&1" "$nodes"
 		if [ "$?" -eq 0 ]; then
 			break
 		fi
+		phd_log LOG_INFO "Retry..."
 	done
 }
 
@@ -95,7 +101,7 @@ pacemaker_cluster_init()
 {
 	local nodes=$(definition_nodes)
 
-	phd_cmd_exec "pcs cluster setup --force --local --name phd-cluster $nodes" "$nodes"
+	phd_cmd_exec "pcs cluster setup --force --local --name phd-cluster $nodes > /dev/null 2>&1" "$nodes"
 	if [ "$?" -ne 0 ]; then
 		phd_exit_failure "Could not setup corosync config for pacemaker cluster"
 	fi
