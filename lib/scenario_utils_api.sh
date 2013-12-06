@@ -7,6 +7,10 @@ LOG_NOTICE="notice"
 LOG_INFO="info"
 LOG_DEBUG="debug"
 
+STDOUT_LOG_LEVEL=2
+
+LOG_UNAME=""
+
 phd_clear_vars()
 {
 	local prefix=$1
@@ -37,7 +41,25 @@ phd_get_value()
 
 phd_log()
 {
-	echo "$1: $2"
+	local priority=$1
+	local msg=$2
+	local level=1
+
+	if [ -z "$LOG_UNAME" ]; then
+		LOG_UNAME=$(uname -n)
+	fi
+
+	case $priority in
+	LOG_ERROR|LOG_ERR|LOG_WARNING) level=0;;
+	LOG_NOTICE) level=1;;
+	LOG_INFO) level=2;;
+	LOG_DEBUG) level=3;;
+	*) echo "!!!WARNING!!! Unknown log level ($priority)"
+	esac
+
+	if [ $level -le $STDOUT_LOG_LEVEL ]; then
+		echo "$priority: $(basename ${BASH_SOURCE[1]})[$$]: ${FUNCNAME[1]}(): ${BASH_LINENO}: $msg"
+	fi
 }
 
 phd_cmd_exec()
