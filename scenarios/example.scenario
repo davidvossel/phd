@@ -66,7 +66,6 @@ target=$PHD_ENV_nodes1
 phd_rsc_verify_start_all
 phd_assert $? 0 "Failed to start all resources"
 
-phd_rsc_relocate web-group
+phd_rsc_relocate web-group 60
 phd_assert $? 0 "Failed to relocate web-group"
-
 ....

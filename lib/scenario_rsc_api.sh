@@ -2,7 +2,13 @@
 
 #. ${PHDCONST_ROOT}/lib/scenario_utils_api.sh
 
-# only top level resources
+##
+# Returns only top level resources.
+# For example, a group with 3 primitives, only the group id will be returned.
+#
+# Usage: phd_rsc_parent_list [execution node]
+# If execution node is not present, the command will be executed locally
+##
 phd_rsc_parent_list()
 {
 	local cmd="cibadmin -Q --local --xpath '//primitive' --node-path | awk -F \"id='\" '{print \$2}' | awk -F \"'\" '{print \$1}' | uniq"
@@ -10,7 +16,12 @@ phd_rsc_parent_list()
 	phd_cmd_exec "$cmd" "$1"
 }
 
-# Only primitives
+##
+# Return primitive resource ids only.
+#
+# Usage: phd_rsc_raw_list [execution node]
+# If execution node is not present, the command will be executed locally
+##
 phd_rsc_raw_list()
 {
 	local cmd="crm_resource -l"
@@ -18,7 +29,12 @@ phd_rsc_raw_list()
 	phd_cmd_exec "$cmd" "$1"
 }
 
-# return the nodes a rsc is active on
+##
+# Return the nodes a rsc is active on
+#
+# Usage: phd_rsc_active_list <rsc id> [execution node]
+# If execution node is not present, the command will be executed locally
+##
 phd_rsc_active_nodes()
 {
 	local rsc=$1
@@ -28,7 +44,16 @@ phd_rsc_active_nodes()
 	phd_cmd_exec "$cmd" "$node"
 }
 
-
+##
+# Returns if a resource is active somewhere in the cluster or not
+#
+# Usage: phd_rsc_verify_is_active <rsc id> <timeout value in seconds> [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return values:
+# 0 active
+# 1 not active
+##
 phd_rsc_verify_is_active()
 {
 	local rsc=$1
@@ -52,9 +77,16 @@ phd_rsc_verify_is_active()
 	return 0
 }
 
-# returns if rsc is active on a node or not.
+##
+# Returns if rsc is active on a specific node or not.
+#
+# Usage: phd_rsc_verify_is_active_on <rsc id> <active node id to check> <timeout in seconds> [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return values:
 # 0 active
 # 1 not active
+##
 phd_rsc_verify_is_active_on()
 {
 	local rsc=$1
@@ -79,10 +111,17 @@ phd_rsc_verify_is_active_on()
 	return 0
 }
 
-
-# returns if rsc is stopped on a node or not.
-# 0 active
-# 1 not active
+##
+# Returns if rsc is stopped on a node or not.
+#
+# Usage:
+# phd_rsc_verify_is_stopped_on <rsc id> <active node id> <timeout in seconds> [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return values:
+# 0 is stopped on node
+# 1 did not stop within timeout period
+##
 phd_rsc_verify_is_stopped_on()
 {
 	local rsc=$1
@@ -107,25 +146,16 @@ phd_rsc_verify_is_stopped_on()
 	return 0
 }
 
-
-# returns whether or not a rsc is started in the cluster
-# 0 started
-# 1 not started
-phd_rsc_is_started()
-{
-	local rsc=$1
-	local node=$2
-	local active_list
-	local active_node
-
-	active_list=$(phd_rsc_active_nodes "$rsc" "$node")
-	if [ -z "$active_list" ]; then
-		phd_log LOG_INFO "$rsc is not active"
-		return 1
-	fi
-	return 0
-}
-
+##
+# Returns whether all the resources are active within the cluster
+#
+# Usage: phd_rsc_verify_start_all <timeout value in seconds> [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return values:
+# 0 all resources are active
+# 1 all resources did not become active during timeout period
+##
 phd_rsc_verify_start_all()
 {
 	local timeout=$1
@@ -140,7 +170,7 @@ phd_rsc_verify_start_all()
 
 	while [ $rc -ne 0 ]; do
 		for rsc in $(echo $rsc_list); do
-			phd_rsc_is_started $rsc $node
+			phd_rsc_verify_is_active $rsc 2 $node
 			rc=$?
 			if [ $rc -ne 0 ]; then
 				phd_log LOG_INFO "Waiting for $rsc to start"
@@ -163,6 +193,16 @@ phd_rsc_verify_start_all()
 	return 0
 }
 
+##
+# Returns whether all the resources are stopped within the cluster
+#
+# Usage: phd_rsc_verify_stop_all <timeout value in seconds> [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return values:
+# 0 all resources are stopped
+# 1 resources did not stop during timeout period
+##
 phd_rsc_verify_stop_all()
 {
 	local timeout=$1
@@ -187,6 +227,17 @@ phd_rsc_verify_stop_all()
 	return 0
 }
 
+##
+# Tells all resources in the cluster to stop.
+# Use with phd_rsc_verify_stop_all to wait on resources to shutdown.
+#
+# Usage: phd_rsc_stop_all [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return values:
+# 0 all resources are disabled via pcs.
+# 1 failed to disable resources
+##
 phd_rsc_stop_all()
 {
 	local node=$1
@@ -204,16 +255,56 @@ phd_rsc_stop_all()
 	done
 }
 
+##
+# Tells all resources in the cluster to start.
+# Use with phd_rsc_verify_start_all to wait on resources to become active
+#
+# Usage: phd_rsc_start_all [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return values:
+# 0 all resources are enabled via pcs
+# 1 failed to enable resources
+##
+phd_rsc_start_all()
+{
+	local node=$1
+	local rsc_list=$(phd_rsc_parent_list "$node")
+	local rsc
+
+	if [ $? -ne 0 ]; then
+		phd_log LOG_ERR "start all failed, unable retrieve resource list"
+		return 1
+	fi
+
+	phd_log LOG_DEBUG "starting all resources. $rsc_list on node $node"
+	for rsc in $(echo $rsc_list); do
+		phd_cmd_exec "pcs resource enable $rsc" "$node"
+	done
+}
+
+##
+# Relocates a resource from the current active node to another node in the cluster..
+#
+# Usage: phd_rsc_relocate <rsc> <timeout> [execution node]
+# If execution node is not present, the command will be executed locally
+#
+# Return values:
+# 0 rsc successfully relocated
+# 1 rsc failed to relocate during timeout period
+##
 phd_rsc_relocate()
 {
 	local rsc=$1
-	local node=$2
+	local timeout=$2
+	local node=$3
 	local cur_node=$(phd_rsc_active_nodes $rsc $node)
 
 	if [ -z "$rsc" ]; then
 		return 1
 	fi
 
+	# If there are more than one nodes returned. this will get the first entry.
 	cur_node=$(echo $cur_node | awk '{print $1}')
 	if [ -z "$cur_node" ]; then
 		return 1
@@ -226,12 +317,12 @@ phd_rsc_relocate()
 
 	phd_log LOG_DEBUG "Moving $rsc away from node $cur_node"
 	phd_cmd_exec "pcs resource move $rsc" "$node"
-	phd_rsc_verify_is_stopped_on "$rsc" "$cur_node" 60 "$node"
+	phd_rsc_verify_is_stopped_on "$rsc" "$cur_node" $timeout "$node"
 	if [ $? -ne 0 ]; then
 		return 1
 	fi
 	# verify it is active anywhere, we don't care where
-	phd_rsc_verify_is_active "$rsc" 60 "$node"
+	phd_rsc_verify_is_active "$rsc" $timeout "$node"
 	if [ $? -ne 0 ]; then
 		return 1
 	fi
