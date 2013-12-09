@@ -241,3 +241,17 @@ phd_wait_pidof()
 
 	return 0
 }
+
+phd_verify_connection()
+{
+	local nodes=$1
+
+	for node in $(echo $nodes); do
+		phd_cmd_exec "ls > /dev/null 2>&1" "$node"
+		if [ $? -ne 0 ]; then
+			phd_exit_failure "Unable to establish connection with node \"$node\""
+		fi
+		phd_log LOG_DEBUG "Node ($node) is accessible"
+	done
+}
+

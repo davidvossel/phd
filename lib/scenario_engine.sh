@@ -409,6 +409,12 @@ scenario_exec()
 	scenario_verify
 	scenario_clean_nodes
 
+	phd_log LOG_NOTICE "========================================="
+	phd_log LOG_NOTICE "==== Verifying Cluster Communication ===="
+	phd_log LOG_NOTICE "========================================="
+	phd_verify_connection "$(definition_nodes)"
+	phd_log LOG_NOTICE "Success: all nodes are accessible"
+
 	phd_log LOG_NOTICE "====================================" 
 	phd_log LOG_NOTICE "====  Checking Cluster Shutdown ====" 
 	phd_log LOG_NOTICE "====================================" 
