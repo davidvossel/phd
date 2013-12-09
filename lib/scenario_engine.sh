@@ -206,7 +206,7 @@ scenario_package_install()
 	fi
 
 	for node in $(scenario_install_nodes); do
-		phd_log LOG_DEBUG "Installing packages \"$packages\" on node \"$node\""
+		phd_log LOG_NOTICE "Installing packages \"$packages\" on node \"$node\""
 		phd_cmd_exec "yum install -y $packages > /dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Could not install required packages on node \"$node\""
