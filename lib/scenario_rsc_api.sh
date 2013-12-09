@@ -11,9 +11,24 @@
 ##
 phd_rsc_parent_list()
 {
-	local cmd="cibadmin -Q --local --xpath '//primitive' --node-path | awk -F \"id='\" '{print \$2}' | awk -F \"'\" '{print \$1}' | uniq"
+	local cmd="cibadmin -Q --local --xpath '//primitive' --node-path"
+	local filter="awk -F \"id='\" '{print \$2}' | awk -F \"'\" '{print \$1}' | uniq"
+	local output
+	local rc=0
 
-	phd_cmd_exec "$cmd" "$1"
+	output=$(phd_cmd_exec "$cmd" "$1")
+	rc=$?
+	if [ $rc -eq 0 ]; then
+		phd_cmd_exec "echo \"$output\" | $filter"
+	else
+		# only return an rc of non-zero if we don't actually have access
+		# to the cib, otherwise there were no resources listed.
+		# TODO - we should be able to detect this from the first cibadmin's return code.
+		phd_cmd_exec "cibadmin -Q --local > /dev/null 2>&1" "$1"
+		rc=$?
+	fi
+
+	return $rc
 }
 
 ##
@@ -241,9 +256,10 @@ phd_rsc_verify_stop_all()
 phd_rsc_stop_all()
 {
 	local node=$1
-	local rsc_list=$(phd_rsc_parent_list "$node")
 	local rsc
+	local rsc_list
 
+	rsc_list=$(phd_rsc_parent_list "$node")
 	if [ $? -ne 0 ]; then
 		phd_log LOG_ERR "stop all failed, unable retrieve resource list"
 		return 1
@@ -269,9 +285,10 @@ phd_rsc_stop_all()
 phd_rsc_start_all()
 {
 	local node=$1
-	local rsc_list=$(phd_rsc_parent_list "$node")
 	local rsc
+	local rsc_list
 
+	rsc_list=$(phd_rsc_parent_list "$node")
 	if [ $? -ne 0 ]; then
 		phd_log LOG_ERR "start all failed, unable retrieve resource list"
 		return 1

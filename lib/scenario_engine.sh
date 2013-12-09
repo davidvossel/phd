@@ -7,7 +7,6 @@
 SENV_PREFIX="PHD_SENV"
 SREQ_PREFIX="PHD_SREQ"
 SCRIPT_PREFIX="PHD_SCPT"
-TMP_DIR="/var/run/phd_scenario"
 
 SEC_REQ="REQUIREMENTS"
 SEC_LOCAL="LOCAL_VARIABLES"
@@ -18,16 +17,16 @@ TEST_INDEX=0
 
 scenario_clean()
 {
-	rm -rf ${TMP_DIR}
-	mkdir -p $TMP_DIR
+	rm -rf ${PHD_TMP_DIR}
+	mkdir -p $PHD_TMP_DIR
 	phd_clear_vars "$SENV_PREFIX"
 }
 
 scenario_clean_nodes()
 {
 	local nodes=$(definition_nodes)
-	phd_cmd_exec "rm -rf $TMP_DIR" "$nodes"
-	phd_cmd_exec "mkdir -p $TMP_DIR/lib" "$nodes"
+	phd_cmd_exec "rm -rf $PHD_TMP_DIR" "$nodes"
+	phd_cmd_exec "mkdir -p $PHD_TMP_DIR/lib" "$nodes"
 }
 
 scenario_script_add_env()
@@ -39,8 +38,8 @@ scenario_script_add_env()
 
 	for file in $(echo $api_files); do
 		file=$(basename $file)
-		echo ". ${TMP_DIR}/lib/${file}" >> $script
-		echo "export PHDCONST_ROOT=\"${TMP_DIR}\"" >> $script
+		echo ". ${PHD_TMP_DIR}/lib/${file}" >> $script
+		echo "export PHDCONST_ROOT=\"${PHD_TMP_DIR}\"" >> $script
 
 	done
 
@@ -106,7 +105,7 @@ scenario_unpack()
 		if [ "$cleaned" = "...." ]; then
 			if [ "$writing_script" -eq 0 ]; then
 				writing_script=1
-				cur_script=${TMP_DIR}/${SCRIPT_PREFIX}${script_num}
+				cur_script=${PHD_TMP_DIR}/${SCRIPT_PREFIX}${script_num}
 				export "${SCRIPT_PREFIX}_${script_num}=${cur_script}"
 				echo "#!/bin/bash" > ${cur_script}
 				scenario_script_add_env "$cur_script"
@@ -160,12 +159,12 @@ scenario_custom_package_install()
 	fi
 
 
-	phd_cmd_exec "mkdir -p $TMP_DIR/phd_rpms/" "$nodes"
+	phd_cmd_exec "mkdir -p $PHD_TMP_DIR/phd_rpms/" "$nodes"
 
 	for entry in $(ls ${package_dir}*.rpm); do
 		packages="$packages $(rpm -qp -i $entry | grep -e 'Name' | sed 's/Name.*: //')"
 		rpms="$rpms $entry"
-		phd_node_cp "$entry" "$TMP_DIR/phd_rpms/" "$nodes"
+		phd_node_cp "$entry" "$PHD_TMP_DIR/phd_rpms/" "$nodes"
 	done
 
 	if [ -z "$rpms" ]; then
@@ -178,7 +177,7 @@ scenario_custom_package_install()
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Could not clean custom packages on \"$node\" before install"
 		fi
-	    phd_cmd_exec "yum install -y $TMP_DIR/phd_rpms/*.rpm > /dev/null 2>&1" "$node"
+	    phd_cmd_exec "yum install -y $PHD_TMP_DIR/phd_rpms/*.rpm > /dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Could not install custom packages on \"$node\""
 		fi
@@ -298,7 +297,7 @@ scenario_distribute_api()
 
 	for file in $(echo $api_files); do
 		file=$(basename $file)
-		phd_node_cp "${PHDCONST_ROOT}/lib/${file}" "${TMP_DIR}/lib/${file}" "$nodes" "755"
+		phd_node_cp "${PHDCONST_ROOT}/lib/${file}" "${PHD_TMP_DIR}/lib/${file}" "$nodes" "755"
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Failed to distribute phd API to nodes. Exiting."
 		fi

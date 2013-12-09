@@ -7,7 +7,9 @@ LOG_NOTICE="notice"
 LOG_INFO="info"
 LOG_DEBUG="debug"
 
-STDOUT_LOG_LEVEL=2
+PHD_LOG_LEVEL=2
+PHD_LOG_STDOUT=1
+PHD_TMP_DIR="/var/run/phd_scenario"
 
 LOG_UNAME=""
 
@@ -39,14 +41,30 @@ phd_get_value()
 	echo $value
 }
 
+phd_time_stamp()
+{
+	date +%b-%d-%T
+}
+
 phd_log()
 {
 	local priority=$1
 	local msg=$2
+	local node=$3
 	local level=1
+	local log_msg
+	local enable_log_stdout=$PHD_LOG_STDOUT
+
+	if [ -z "$msg" ]; then
+		return
+	fi
 
 	if [ -z "$LOG_UNAME" ]; then
 		LOG_UNAME=$(uname -n)
+	fi
+
+	if [ -z "$node" ]; then
+		node=$LOG_UNAME
 	fi
 
 	case $priority in
@@ -54,12 +72,48 @@ phd_log()
 	LOG_NOTICE) level=1;;
 	LOG_INFO) level=2;;
 	LOG_DEBUG) level=3;;
-	*) echo "!!!WARNING!!! Unknown log level ($priority)"
+	LOG_TRACE) level=4;;
+	# exec output can only be logged to files
+	LOG_EXEC) level=5; enable_log_stdout=0;;
+	*) phd_log LOG_WARNING "!!!WARNING!!! Unknown log level ($priority)"
 	esac
 
-	if [ $level -le $STDOUT_LOG_LEVEL ]; then
-		echo "$priority: $(basename ${BASH_SOURCE[1]})[$$]: ${FUNCNAME[1]}(): ${BASH_LINENO} - $msg"
+	log_msg="$priority: $node: $(basename ${BASH_SOURCE[1]})[$$]:${BASH_LINENO} - $msg"
+	if [ $level -le $PHD_LOG_LEVEL ]; then
+		if [ $enable_log_stdout -ne 0 ]; then
+			echo "$log_msg"
+		fi
 	fi
+
+	# log everything to log file
+	if [ -n "$PHD_LOG_FILE" ]; then
+		echo "$(phd_time_stamp): $log_msg" >> $PHD_LOG_FILE
+	fi
+}
+
+phd_set_exec_dir()
+{
+	PHD_TMP_DIR=$1
+	if [ -z "$PHD_LOG_FILE" ]; then
+		phd_set_log_file "${PHD_TMP_DIR}/phd.log"
+	fi
+	phd_log LOG_NOTICE "logfile=$PHD_LOG_FILE"
+}
+
+phd_enable_stdout_log()
+{
+	PHD_LOG_STDOUT=$1
+}
+
+phd_set_log_level()
+{
+	PHD_LOG_LEVEL="$1"
+}
+
+phd_set_log_file()
+{
+	PHD_LOG_FILE="$1"
+	phd_log LOG_NOTICE "Writing to logfile at $1"
 }
 
 phd_cmd_exec()
@@ -68,20 +122,36 @@ phd_cmd_exec()
 	local nodes=$2
 	local node
 	local rc=1
+	local output=""
+
 
 	# execute locally if no nodes are given
 	if [ -z "$nodes" ]; then
-		eval $cmd
-		return $?
-	fi
-	# TODO - support multiple transports
-	for node in $(echo $nodes); do
-		phd_ssh_cmd_exec "$cmd" "$node"
+		phd_log LOG_EXEC "$cmd"
+		output=$(eval $cmd 2>&1)
 		rc=$?
-		if [ $rc -eq 137 ]; then
-			phd_exit_failure "Timed out waiting for cmd ($cmd) to execute on node $node"
+
+		if [ -n "$output" ]; then
+			echo $output
+			phd_log LOG_EXEC "$output"
 		fi
-	done
+	else
+		# TODO - support multiple transports
+		for node in $(echo $nodes); do
+			phd_log LOG_EXEC "$node - $cmd"
+			output=$(phd_ssh_cmd_exec "$cmd" "$node" 2>&1)
+			rc=$?
+
+			if [ -n "$output" ]; then
+				echo $output
+				phd_log LOG_EXEC "$output" "$node"
+			fi
+			if [ $rc -eq 137 ]; then
+				phd_exit_failure "Timed out waiting for cmd ($cmd) to execute on node $node"
+			fi
+		done
+	fi
+
 	return $rc
 }
 
@@ -120,7 +190,7 @@ phd_script_exec()
 		phd_log LOG_DEBUG "executing script \"$script\" on node \"$node\""		
 		phd_cmd_exec "mkdir -p $dir" "$node" > /dev/null 2>&1
 		phd_node_cp "$script" "$script" "$node" "755" > /dev/null 2>&1
-		phd_cmd_exec "$script" "$node"
+		phd_cmd_exec "$script" "$node" > /dev/null 2>&1
 	done
 }
 
