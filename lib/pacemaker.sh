@@ -68,6 +68,9 @@ pacemaker_cluster_start()
 {
 	local nodes=$(definition_nodes)
 	local node
+	local timeout=120
+	local lapse_sec=0
+	local start_time=0
 
 	for node in $(echo $nodes); do
 		phd_log LOG_NOTICE "Starting cluster stack on node $node"
@@ -78,15 +81,20 @@ pacemaker_cluster_start()
 	done
 
 	node=$(definition_node "1")
+	start_time=$(date +%s)
 
 	while true; do
-		# TODO time this out
+		lapse_sec=`expr $(date +%s) - $start_time`
 		phd_log LOG_INFO "Waiting for pacemaker cluster to come up."
-		phd_cmd_exec "cibadmin -Q > /dev/null 2>&1" "$nodes"
+		phd_cmd_exec "cibadmin -Q > /dev/null 2>&1" "$node"
 		if [ "$?" -eq 0 ]; then
 			break
 		fi
+		if [ $lapse_sec -ge $timeout ]; then
+			phd_exit_failure "Timed out waiting for the pacemaker cluster to come up."
+		fi
 		phd_log LOG_INFO "Retry..."
+		sleep 1
 	done
 }
 
