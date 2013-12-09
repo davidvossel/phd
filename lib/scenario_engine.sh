@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. ${PHDCONST_ROOT}/lib/scenario_utils_api.sh
+. ${PHDCONST_ROOT}/lib/phd_utils_api.sh
 . ${PHDCONST_ROOT}/lib/pacemaker.sh
 . ${PHDCONST_ROOT}/lib/shared_storage.sh
 

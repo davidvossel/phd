@@ -11,7 +11,7 @@ fi
 exec_dir="/var/run/phd_scenario"
 
 . ${PHDCONST_ROOT}/lib/transport_ssh.sh
-. ${PHDCONST_ROOT}/lib/scenario_utils_api.sh
+. ${PHDCONST_ROOT}/lib/phd_utils_api.sh
 . ${PHDCONST_ROOT}/lib/scenario_engine.sh
 . ${PHDCONST_ROOT}/lib/definition.sh
 

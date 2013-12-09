@@ -1,6 +1,6 @@
 #!/bin/bash
-. ${PHDCONST_ROOT}/lib/scenario_utils_api.sh
-. ${PHDCONST_ROOT}/lib/scenario_rsc_api.sh
+. ${PHDCONST_ROOT}/lib/phd_utils_api.sh
+. ${PHDCONST_ROOT}/lib/phd_rsc_api.sh
 
 pacemaker_kill_processes()
 {
