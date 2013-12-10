@@ -92,9 +92,6 @@ target=$PHD_ENV_nodes1
 ....
 tmpfile=mktemp
 
-pcs property set stonith-enabled=false
-pcs property set no-quorum-policy=ignore
-
 pcs cluster cib $tmpfile
 pcs -f $tmpfile resource create web-vg LVM volgrpname=cluster_vg exclusive=true
 pcs -f $tmpfile resource create web-data Filesystem device="/dev/cluster_vg/cluster_lv" directory="/var/www" fstype="ext4" op monitor interval=30s on-fail=fence

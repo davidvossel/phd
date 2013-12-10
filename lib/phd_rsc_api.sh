@@ -3,45 +3,39 @@
 #. ${PHDCONST_ROOT}/lib/phd_utils_api.sh
 
 ##
-# Returns only top level resources.
+# Returns only top level resources (Excludes stonith resources)
 # For example, a group with 3 primitives, only the group id will be returned.
 #
-# Usage: phd_rsc_parent_list [execution node]
+# Usage: phd_rsc_list <parent resources only> [execution node]
 # If execution node is not present, the command will be executed locally
 ##
-phd_rsc_parent_list()
+phd_rsc_list()
 {
-	local cmd="cibadmin -Q --local --xpath '//primitive' --node-path"
-	local filter="awk -F \"id='\" '{print \$2}' | awk -F \"'\" '{print \$1}' | uniq"
+	local parent_only=$1
+	local node=$2
 	local output
 	local rc=0
+	local cmd="cibadmin -Q --local --xpath \"//primitive[@class!='stonith']\" --node-path"
+	local parent_filter="awk -F \"id='\" '{print \$2}' | awk -F \"'\" '{print \$1}' | uniq"
+	local raw_filter="sed \"s/.*primitive\\[@id='//g\" | sed \"s/'\\]//g\""
+	local filter=$raw_filter
 
-	output=$(phd_cmd_exec "$cmd" "$1")
+	output=$(phd_cmd_exec "$cmd" "$node")
 	rc=$?
 	if [ $rc -eq 0 ]; then
-		phd_cmd_exec "echo \"$output\" | $filter"
+		if [ $parent_only -eq 1 ]; then
+			filter=$parent_filter
+		fi
+		phd_cmd_exec "echo \"$output\" | tr ' ' '\n' | $filter"
 	else
 		# only return an rc of non-zero if we don't actually have access
 		# to the cib, otherwise there were no resources listed.
 		# TODO - we should be able to detect this from the first cibadmin's return code.
-		phd_cmd_exec "cibadmin -Q --local > /dev/null 2>&1" "$1"
+		phd_cmd_exec "cibadmin -Q --local > /dev/null 2>&1" "$node"
 		rc=$?
 	fi
 
 	return $rc
-}
-
-##
-# Return primitive resource ids only.
-#
-# Usage: phd_rsc_raw_list [execution node]
-# If execution node is not present, the command will be executed locally
-##
-phd_rsc_raw_list()
-{
-	local cmd="crm_resource -l"
-
-	phd_cmd_exec "$cmd" "$1"
 }
 
 ##
@@ -175,7 +169,7 @@ phd_rsc_verify_start_all()
 {
 	local timeout=$1
 	local node=$2
-	local rsc_list=$(phd_rsc_raw_list "$node")
+	local rsc_list=$(phd_rsc_list 0 "$node")
 	local lapse_sec=0
 	local stop_time=0
 	local rsc
@@ -224,7 +218,7 @@ phd_rsc_verify_stop_all()
 	local node="$2"
 	local lapse_sec=0
 	local stop_time=0
-	local cmd="crm_mon -X | grep 'active=\"true\"' -q"
+	local cmd="crm_mon -X | grep 'active=\"true\"' | grep -v 'resource_agent=\"stonith' -q"
 
 	stop_time=$(date +%s)
 	phd_cmd_exec "$cmd" "$node"
@@ -259,7 +253,7 @@ phd_rsc_stop_all()
 	local rsc
 	local rsc_list
 
-	rsc_list=$(phd_rsc_parent_list "$node")
+	rsc_list=$(phd_rsc_list 1 "$node")
 	if [ $? -ne 0 ]; then
 		phd_log LOG_ERR "stop all failed, unable retrieve resource list"
 		return 1
@@ -288,7 +282,7 @@ phd_rsc_start_all()
 	local rsc
 	local rsc_list
 
-	rsc_list=$(phd_rsc_parent_list "$node")
+	rsc_list=$(phd_rsc_list 1 "$node")
 	if [ $? -ne 0 ]; then
 		phd_log LOG_ERR "start all failed, unable retrieve resource list"
 		return 1

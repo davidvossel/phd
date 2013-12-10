@@ -114,3 +114,15 @@ pacemaker_cluster_init()
 		phd_exit_failure "Could not setup corosync config for pacemaker cluster"
 	fi
 }
+
+pacemaker_fence_init()
+{
+	local node=$(definition_node "1")
+	local script="${PHD_TMP_DIR}/FENCE_AGENTS"
+
+	write_fence_cmds "$script"
+	phd_script_exec "$script" "$node"
+	if [ $? -ne 0 ]; then
+		phd_exit_failure "Failed to initialize cluster fencing."
+	fi
+}

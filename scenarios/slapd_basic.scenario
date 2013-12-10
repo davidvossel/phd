@@ -78,7 +78,5 @@ exit 1
 
 target=$PHD_ENV_nodes1
 ....
-pcs property set stonith-enabled=false
-pcs property set no-quorum-policy=ignore
 pcs resource create ldap ocf:heartbeat:slapd config=/etc/openldap/slapd.d
 ....

@@ -34,17 +34,12 @@ systemctl stop nfs-lock
 target=$PHD_ENV_nodes1
 ....
 tmpfile=mktemp
-
-pcs property set stonith-enabled=false
 pcs resource defaults resource-stickiness=100
-
 pcs cluster cib $tmpfile
-
 pcs -f $tmpfile resource create dlm controld op monitor interval=30s on-fail=fence clone interleave=true ordered=true
 pcs -f $tmpfile resource create clvmd lsb:clvmd op monitor interval=30s on-fail=fence clone interleave=true ordered=true
 pcs -f $tmpfile constraint order start dlm-clone then clvmd-clone
 pcs -f $tmpfile constraint colocation add clvmd-clone with dlm-clone
-
 pcs cluster cib-push $tmpfile
 
 phd_wait_pidof "clvmd" 45

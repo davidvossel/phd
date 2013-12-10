@@ -46,8 +46,6 @@ END
 ##
 target=$PHD_ENV_nodes1
 ....
-pcs property set stonith-enabled=false
-pcs property set no-quorum-policy=ignore
 pcs resource create web-site ocf:heartbeat:apache  configfile=/etc/httpd/conf/httpd.conf statusurl="http://localhost/server-status" op monitor interval=1min
 pcs resource create web-ip ocf:heartbeat:IPaddr2 ip=$PHD_ENV_floating_ips1
 pcs resource group add web-group web-site web-ip

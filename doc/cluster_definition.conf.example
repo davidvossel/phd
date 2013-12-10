@@ -4,24 +4,51 @@
 #==#==# Cluster Resource Variables
 
 ##
-# Cluster nodes available.  If blank, corosync node list will be used.
+# Cluster nodes available.
+# NOTE: This option is required for all scenarios
+#
+# Example:
 # nodes=pcmk_node1 pcmk_node2
 ##
 
 ## 
-# Available floating ip addressesto use in scenarios
+# Available floating ip addresses.
+#
+# Example:
 # floating_ips=192.168.122.200
+##
+
+##
+# Setting up phd to automate complex fencing setups
+# can be accomplished using the 'fence_cmd' option.
+#
+# NOTE: By default phd will set the 'stonith_enabled=false'
+# global pacemaker property when no 'fence_cmd' entries are
+# present.
+#
+# The 'fence_cmd' option allow fencing agents to be defined
+# within the cluster before the scenario is executed.  Multiple
+# 'fence_cmd' entires can be listed. They are executed in the order
+# they are listed in this file.
+#
+# Example:
+# fence_cmd=pcs stonith create shooter fence_xvm
+# fence_cmd=pcs stonith create fake_shooter fence_dummy
 ##
 
 ##
 # Custom RPMS to use during scenario execution
 # package_dir=/root/rpmbuild/RPMS/x86_64/
 ##
+
+##
+# Define shared storage devices available to all nodes
+# using the 'shared_storage' option.  Storage devices
+# are separated by a space.
 #
-##
-# shared storage devices available to all nodes
-##
+# Example:
 # shared_storage=/dev/vdb /dev/vdc
+##
 
 #==#==# Cluster Configuration Method Variables
 
@@ -33,7 +60,8 @@
 # ssh = all nodes can talk to each other via ssh without requiring passwords
 # pcsd = all nodes are capable of communicating via pcsd
 #
-transports=ssh
+# Example:
+# transports=ssh
 ##
 
 ##

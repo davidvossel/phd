@@ -282,6 +282,7 @@ scenario_cluster_init()
 	if [ "$cluster_init" -eq "1" ]; then
 		pacemaker_cluster_init
 		pacemaker_cluster_start
+		pacemaker_fence_init
 		phd_log LOG_NOTICE "Success: Cluster started"
 	else 
 		phd_log LOG_NOTICE "Success: Skipping cluster start"

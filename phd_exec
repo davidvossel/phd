@@ -8,7 +8,7 @@ if [ -z "$PHDCONST_ROOT" ]; then
 	fi
 fi
 
-exec_dir="/var/run/phd_scenario"
+exec_dir="/var/run"
 
 . ${PHDCONST_ROOT}/lib/transport_ssh.sh
 . ${PHDCONST_ROOT}/lib/phd_utils_api.sh
@@ -60,13 +60,13 @@ while true ; do
 	-l|--log-file)  phd_set_log_file $2; shift; shift;;
 	-L|--log-level-stdout) phd_set_log_level $2; shift; shift;;
 	-q|--quiet) phd_enable_stdout_log 0; shift;;
-	-d|--exec-der) exec_dir=$2; shift; shift;;
+	-d|--exec-dir) exec_dir=$2; shift; shift;;
 	"") break;;
 	*) helptext 1;;
 	esac
 done
 
-phd_set_exec_dir "$exec_dir"
+phd_set_exec_dir "$exec_dir/phd_scenario"
 
 definition_unpack $definition
 scenario_unpack $scenario

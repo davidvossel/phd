@@ -3,11 +3,11 @@
 shared_storage_destroy()
 {
 	local nodes=$(definition_nodes)
-	local corosync_start="$TMP_DIR/PHD_STORAGE_COROSYNC_START"
-	local clvmd_start="$TMP_DIR/PHD_STORAGE_CLVMD_START"
-	local clvmd_stop="$TMP_DIR/PHD_STORAGE_CLVMD_STOP"
-	local umount_script="$TMP_DIR/PHD_STORAGE_UMOUNT"
-	local wipe_script="$TMP_DIR/PHD_STORAGE_WIPE"
+	local corosync_start="$PHD_TMP_DIR/PHD_STORAGE_COROSYNC_START"
+	local clvmd_start="$PHD_TMP_DIR/PHD_STORAGE_CLVMD_START"
+	local clvmd_stop="$PHD_TMP_DIR/PHD_STORAGE_CLVMD_STOP"
+	local umount_script="$PHD_TMP_DIR/PHD_STORAGE_UMOUNT"
+	local wipe_script="$PHD_TMP_DIR/PHD_STORAGE_WIPE"
 	local shared_dev=$(definition_shared_dev)
 
 	phd_log LOG_NOTICE "Wiping shared storage device[s] ($shared_dev)"
