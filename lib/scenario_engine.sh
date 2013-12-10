@@ -459,7 +459,10 @@ scenario_exec_tests()
 	phd_log LOG_NOTICE "==== Executing Test Scripts  ====" 
 	phd_log LOG_NOTICE "=================================" 
 
-	scenario_script_exec 1
-
-	phd_log LOG_NOTICE "Success: All tests Passed" 
+	if [ $TEST_INDEX -eq 0 ]; then
+		phd_log LOG_NOTICE "No tests exist for this scenario"
+	else
+		scenario_script_exec 1
+		phd_log LOG_NOTICE "Success: All tests Passed"
+	fi
 }
