@@ -16,8 +16,10 @@ definition_unpack()
 	local entry_num
 
 	if [ -z "$1" ]; then
-		phd_log LOG_ERR "No cluster definition given"
-		return 1
+		phd_exit_failure "No cluster definition provided"
+	fi
+	if [ ! -e "$1" ]; then
+		phd_exit_failure "Custer definition at $1 does not exist"
 	fi
 
 	definition_clean

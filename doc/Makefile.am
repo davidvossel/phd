@@ -14,13 +14,6 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 
 ACLOCAL_AMFLAGS		= -I m4
 
-phd_scenariosdir = $(libexecdir)/$(PACKAGE)/scenarios
+phd_confdir = $(sysconfdir)/phd
 
-phd_scenarios_SCRIPTS = apache_shared_lvm.scenario \
-	cluster-destroy.scenario	\
-	cluster-init.scenario	\
-	cts-virt.scenario	\
-	example.scenario	\
-	nfs_shared_clvmd.scenario	\
-	slapd_basic.scenario	\
-	wipe-storage.scenario
+phd_conf_DATA = cluster_definition.conf.example

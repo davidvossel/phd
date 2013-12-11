@@ -92,6 +92,7 @@ phd_exec \
 lib/Makefile	\
 scenarios/Makefile	\
 environment/Makefile	\
+doc/Makefile	\
 )
 AC_OUTPUT
 
