@@ -2,9 +2,6 @@
 SPEC			= $(PACKAGE_NAME).spec
 TARFILE			= $(PACKAGE_NAME)-$(VERSION).tar.gz
 
-
-EXTRA_DIST		= autogen.sh $(SPEC).in
-
 AUTOMAKE_OPTIONS	= foreign
 
 MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
@@ -12,8 +9,9 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 			  autoheader automake autoconf libtool libtoolize \
 			  ltmain.sh
 
-SUBDIRS	= lib scenarios environment
-
 ACLOCAL_AMFLAGS		= -I m4
 
-sbin_SCRIPTS = phd_exec
+phd_environmentdir = $(libexecdir)/$(PACKAGE_NAME)/environment
+
+phd_environment_SCRIPTS = lvm.conf.phd_default
+

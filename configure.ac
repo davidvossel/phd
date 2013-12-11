@@ -69,10 +69,29 @@ case $exec_prefix in
   prefix) exec_prefix=$prefix;;
 esac
 
+# expand the autoconf vars
+eval prefix="`eval echo ${prefix}`"
+eval exec_prefix="`eval echo ${exec_prefix}`"
+eval bindir="`eval echo ${bindir}`"
+eval sbindir="`eval echo ${sbindir}`"
+eval libexecdir="`eval echo ${libexecdir}`"
+eval datadir="`eval echo ${datadir}`"
+eval sysconfdir="`eval echo ${sysconfdir}`"
+eval sharedstatedir="`eval echo ${sharedstatedir}`"
+eval localstatedir="`eval echo ${localstatedir}`"
+eval libdir="`eval echo ${libdir}`"
+eval includedir="`eval echo ${includedir}`"
+eval oldincludedir="`eval echo ${oldincludedir}`"
+eval infodir="`eval echo ${infodir}`"
+eval mandir="`eval echo ${mandir}`"
+
+
 AC_CONFIG_FILES(
 Makefile \
+phd_exec \
 lib/Makefile	\
 scenarios/Makefile	\
+environment/Makefile	\
 )
 AC_OUTPUT
 

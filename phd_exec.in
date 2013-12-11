@@ -1,14 +1,11 @@
 #!/bin/bash
 
 if [ -z "$PHDCONST_ROOT" ]; then
-	if [ "$(basename $(pwd))" = "exec" ]; then
-		PHDCONST_ROOT=$(dirname $(pwd))
-	else
-		PHDCONST_ROOT=$(pwd)
-	fi
+	PHDCONST_ROOT="@libexecdir@/phd"
 fi
 
-exec_dir="/var/run"
+# Location of current scenario data
+exec_dir="@localstatedir@/lib/phd"
 
 . ${PHDCONST_ROOT}/lib/transport_ssh.sh
 . ${PHDCONST_ROOT}/lib/phd_utils_api.sh
@@ -32,7 +29,6 @@ function helptext() {
 	echo "-l, --log-file           Custom logfile location."
 	echo "-L, --log-level-stdout   Log level 0-4. The higher the level, the more output."
 	echo "-q, --quiet              Keep stdout quiet."
-	echo "-d, --exec-dir           The directory to use for log files and exec scripts across the cluster."
 	echo ""
 	exit $1
 }
@@ -51,21 +47,22 @@ fi
 print_env=0
 check_only=0
 tests=0
+log_file="$exec_dir/phd.log"
 while true ; do
 	case "$1" in
 	--help|-h|-\?) helptext 0;;
 	-p|--print-env) print_env=1; shift;;
 	-v|--verify)     check_only=1; shift;;
 	-t|--run-tests)  tests=1; shift;;
-	-l|--log-file)  phd_set_log_file $2; shift; shift;;
+	-l|--log-file)  log_file=$2; shift; shift;;
 	-L|--log-level-stdout) phd_set_log_level $2; shift; shift;;
 	-q|--quiet) phd_enable_stdout_log 0; shift;;
-	-d|--exec-dir) exec_dir=$2; shift; shift;;
 	"") break;;
 	*) helptext 1;;
 	esac
 done
 
+phd_set_log_file "$log_file"
 phd_set_exec_dir "$exec_dir/phd_scenario"
 
 definition_unpack $definition
