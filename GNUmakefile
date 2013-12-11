@@ -35,8 +35,8 @@ NEXT_RELEASE	?= $(shell echo $(LAST_RELEASE) | awk -F. '/[0-9]+\./{$$3+=1;OFS=".
 beekhof:
 	echo $(LAST_RELEASE) $(NEXT_RELEASE)
 
-BUILD_COUNTER	?= build.counter
-LAST_COUNT      = $(shell test ! -e $(BUILD_COUNTER) && echo 0; test -e $(BUILD_COUNTER) && cat $(BUILD_COUNTER))
+#LAST_COUNT      = $(shell test ! -e $(BUILD_COUNTER) && echo 0; test -e $(BUILD_COUNTER) && cat $(BUILD_COUNTER))
+LAST_COUNT		= $(shell git log --pretty=format:%s $(LAST_RELEASE)..HEAD | wc -l)
 COUNT           = $(shell expr 1 + $(LAST_COUNT))
 
 init:
@@ -75,9 +75,6 @@ $(PACKAGE)-%.spec: $(PACKAGE).spec.in
 srpm-%:	export $(PACKAGE)-%.spec
 	rm -f *.src.rpm
 	cp $(PACKAGE)-$*.spec $(PACKAGE).spec
-	if [ -e $(BUILD_COUNTER) ]; then					\
-		echo $(COUNT) > $(BUILD_COUNTER);				\
-	fi
 	sed -i 's/Source0:.*/Source0:\ $(TARFILE)/' $(PACKAGE).spec
 	sed -i 's/global\ specversion.*/global\ specversion\ $(COUNT)/' $(PACKAGE).spec
 	sed -i 's/global\ upstream_version.*/global\ upstream_version\ $(TAG)/' $(PACKAGE).spec
