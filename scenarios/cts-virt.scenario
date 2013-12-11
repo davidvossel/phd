@@ -20,7 +20,7 @@ cluster_destroy=1
 ##
 target=local
 ....
-local nodename = $(crm_node -n)
+nodename = $(crm_node -n)
 for node in $(echo $PHD_ENV_nodes); do
 	if [ "$HOSTNAME" = "node" ]; then
 		echo "Must run the virt cts scenario on a node outside of the cluster"

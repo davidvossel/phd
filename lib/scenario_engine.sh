@@ -353,18 +353,25 @@ scenario_script_exec()
 		fi
 		if [ "$nodes" = "all" ]; then
 			nodes=$(definition_nodes)
-		elif [ "$nodes" = "local" ]; then
-			nodes=$(hostname)
 		fi
 
-		phd_log LOG_NOTICE "executing $script on nodes \"$nodes\""
-		for node in $(echo $nodes); do
-			phd_script_exec $script "$node"
+		if [ "$nodes" = "local" ]; then
+			phd_log LOG_NOTICE "executing $script locally"
+			eval $script
 			rc=$?
 			if [ "$expected_rc" -ne "$rc" ]; then
 				phd_exit_failure "Script $script_num exit code is $rc, expected $expected_rc Exiting."
 			fi
-		done
+		else
+			phd_log LOG_NOTICE "executing $script on nodes \"$nodes\""
+			for node in $(echo $nodes); do
+				phd_script_exec $script "$node"
+				rc=$?
+				if [ "$expected_rc" -ne "$rc" ]; then
+					phd_exit_failure "Script $script_num exit code is $rc, expected $expected_rc Exiting."
+				fi
+			done
+		fi
 		script_num=$(($script_num + 1))
 
 		if [ $execute_tests -eq 0 ]; then
