@@ -2,9 +2,22 @@
 %global numcomm @numcomm@
 %global dirty @dirty@
 
+%global specversion 1
+%global upstream_version HEAD
+%global upstream_prefix phd
+
+# Use a different versioning scheme
+%bcond_with pre_release
+
+%if %{with pre_release}
+%global phd_release 0.%{specversion}.%{upstream_version}.git
+%else
+%global phd_release %{specversion}
+%endif
+
 Name:           phd
-Version:        0.1
-Release:        1%{?numcomm:.%{numcomm}}%{?alphatag:.%{alphatag}}%{?dirty:.%{dirty}}%{?dist}
+Version:        0.1.0
+Release:        %{phd_release}%{?numcomm:.%{numcomm}}%{?alphatag:.%{alphatag}}%{?dirty:.%{dirty}}%{?dist}
 Summary:        The study and application of the Pacemaker arts.
 
 Group:          System Environment/Libraries
