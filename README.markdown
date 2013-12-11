@@ -1,4 +1,4 @@
-# phd - The study of applied Pacemaker arts.
+# phd - The study and application of the Pacemaker arts.
 
 The phd project allows users to quickly initialize an HA cluster to a specific cluster scenario.
 
