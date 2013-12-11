@@ -102,7 +102,7 @@ pacemaker_cluster_clean()
 {
 	local nodes=$(definition_nodes)
 
-	phd_cmd_exec "rm -rf /var/lib/pacemaker/cib/* /var/lib/pacemaker/cores/* /var/lib/pacemaker/blackbox/* /var/lib/pacemaker/pengine/*" "$nodes"
+	phd_cmd_exec "rm -rf '/var/lib/pacemaker/cib/*' '/var/lib/pacemaker/cores/*' '/var/lib/pacemaker/blackbox/*' '/var/lib/pacemaker/pengine/*'" "$nodes"
 }
 
 pacemaker_cluster_init()

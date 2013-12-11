@@ -7,6 +7,8 @@
 nodes=2
 shared_storage=1
 floating_ips=1
+fence_cmd=1
+
 packages=pacemaker corosync pcs dlm lvm2 lvm2-cluster nfs-utils resource-agents
 cluster_init=1
 clean_shared_storage=1

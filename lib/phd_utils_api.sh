@@ -124,7 +124,6 @@ phd_cmd_exec()
 	local rc=1
 	local output=""
 
-
 	# execute locally if no nodes are given
 	if [ -z "$nodes" ]; then
 		phd_log LOG_EXEC "$cmd"
@@ -190,7 +189,7 @@ phd_script_exec()
 		phd_log LOG_DEBUG "executing script \"$script\" on node \"$node\""		
 		phd_cmd_exec "mkdir -p $dir" "$node" > /dev/null 2>&1
 		phd_node_cp "$script" "$script" "$node" "755" > /dev/null 2>&1
-		phd_cmd_exec "$script" "$node" > /dev/null 2>&1
+		phd_cmd_exec "$script" "$node"
 	done
 }
 

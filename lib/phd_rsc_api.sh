@@ -15,13 +15,19 @@ phd_rsc_list()
 	local node=$2
 	local output
 	local rc=0
-	local cmd="cibadmin -Q --local --xpath \"//primitive[@class!='stonith']\" --node-path"
+	local cmd_no_stonith="cibadmin -Q --local --xpath \"//primitive[@class!='stonith']\" --node-path"
+	local cmd="cibadmin -Q --local --xpath \"//primitive\" --node-path"
 	local parent_filter="awk -F \"id='\" '{print \$2}' | awk -F \"'\" '{print \$1}' | uniq"
 	local raw_filter="sed \"s/.*primitive\\[@id='//g\" | sed \"s/'\\]//g\""
 	local filter=$raw_filter
 
-	output=$(phd_cmd_exec "$cmd" "$node")
+	output=$(phd_cmd_exec "$cmd_no_stonith" "$node")
 	rc=$?
+	if [ $rc -ne 0 ]; then
+		output=$(phd_cmd_exec "$cmd" "$node")
+		rc=$?
+	fi	
+
 	if [ $rc -eq 0 ]; then
 		if [ $parent_only -eq 1 ]; then
 			filter=$parent_filter
