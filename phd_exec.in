@@ -78,7 +78,8 @@ fi
 if [ ! -e "$scenario" ]; then
 	scenario="$scenario_dir/$scenario" 
 	if [ ! -e "$scenario" ]; then
-		if [ ! -e "${scenario}.scenario" ]; then
+		scenario="$scenario\.scenario"
+		if [ ! -e "$scenario" ]; then
 			echo "Error: Can not find specified scenario file"
 			exit 1
 		fi
