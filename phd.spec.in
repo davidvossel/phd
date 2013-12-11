@@ -1,0 +1,51 @@
+%global alphatag @alphatag@
+%global numcomm @numcomm@
+%global dirty @dirty@
+
+Name:           phd
+Version:        0.1
+Release:        1%{?numcomm:.%{numcomm}}%{?alphatag:.%{alphatag}}%{?dirty:.%{dirty}}%{?dist}
+Summary:        The study and application of the Pacemaker arts.
+
+Group:          System Environment/Libraries
+License:        LGPLv2+
+URL:			https://github.com/davidvossel/phd
+Source0:        %{name}-%{version}%{?numcomm:.%{numcomm}}%{?alphatag:-%{alphatag}}%{?dirty:-%{dirty}}.tar.gz
+BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
+BuildRequires:  autoconf automake libtool
+
+%description
+phd deploys pacemaker scenarios on a set of cluster nodes.
+
+%prep
+%setup -q -n %{name}-%{version}%{?numcomm:.%{numcomm}}%{?alphatag:-%{alphatag}}%{?dirty:-%{dirty}}
+
+%build
+./autogen.sh
+%configure 
+make
+
+%check
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%post
+%postun
+
+%files
+%defattr(-,root,root,-)
+
+%{_libexecdir}/phd/lib/*
+%{_libexecdir}/phd/scenarios/*
+%{_libexecdir}/phd/environment/*
+%{_sysconfdir}/phd/*
+
+%changelog
+* @date@ Autotools generated version <nobody@nowhere.org> - @version@-1-@numcomm@.@alphatag@.@dirty@
+- Autotools generated version
