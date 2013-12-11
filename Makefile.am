@@ -7,6 +7,8 @@ EXTRA_DIST		= autogen.sh $(SPEC).in
 
 AUTOMAKE_OPTIONS	= foreign
 
+CLEANFILES	= phd_exec
+
 MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 			  config.guess config.sub missing install-sh \
 			  autoheader automake autoconf libtool libtoolize \
