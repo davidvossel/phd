@@ -18,7 +18,7 @@ phd_ssh_cmd_exec()
 	local node=$2
 	local fullcmd="ssh -o ConnectTimeout=30 -o BatchMode=yes -l root $node $cmd"
 
-	eval timeout -s KILL 120 $fullcmd
+	timeout -s KILL 120 $fullcmd
 }
 
 #phd_ssh_connection_verify()

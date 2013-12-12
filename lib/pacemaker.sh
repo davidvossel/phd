@@ -101,8 +101,14 @@ pacemaker_cluster_start()
 pacemaker_cluster_clean()
 {
 	local nodes=$(definition_nodes)
+	local output
 
-	phd_cmd_exec "rm -rf '/var/lib/pacemaker/cib/*' '/var/lib/pacemaker/cores/*' '/var/lib/pacemaker/blackbox/*' '/var/lib/pacemaker/pengine/*'" "$nodes"
+	phd_cmd_exec "rm -rf /var/lib/pacemaker/cib /var/lib/pacemaker/cores /var/lib/pacemaker/blackbox /var/lib/pacemaker/pengine" "$nodes"
+
+	output=$(phd_cmd_exec "ls /var/lib/pacemaker/cib/" "$nodes")
+	if [ $? -eq 0 ]; then
+		phd_exit_failure "Unable to clear cluster cache. $output"
+	fi
 }
 
 pacemaker_cluster_init()

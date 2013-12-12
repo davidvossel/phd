@@ -35,7 +35,7 @@ phd_get_value()
 	local value=$1
 
 	if [ "${value:0:1}" = "\$" ]; then
-		echo $(eval echo $value)
+		eval echo $value
 		return
 	fi
 	echo $value
