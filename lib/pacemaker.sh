@@ -115,10 +115,21 @@ pacemaker_cluster_init()
 {
 	local nodes=$(definition_nodes)
 
-	phd_cmd_exec "pcs cluster setup --force --local --name phd-cluster $nodes > /dev/null 2>&1" "$nodes"
-	if [ "$?" -ne 0 ]; then
-		phd_exit_failure "Could not setup corosync config for pacemaker cluster"
-	fi
+       # There is a pcs syntax change that results in us trying to
+       # initialize the cluster in multiple ways.
+        phd_cmd_exec "pcs cluster setup --force --local --name phd-cluster $nodes > /dev/null 2>&1" "$nodes"
+        if [ "$?" -ne 0 ]; then
+               phd_cmd_exec "pcs cluster setup --local phd-cluster $nodes > /dev/null 2>&1" "$nodes"
+               if [ "$?" -ne 0 ]; then
+                       phd_exit_failure "Could not setup corosync config for pacemaker cluster"
+               fi
+               local numnodes=$(echo $nodes | wc -w)
+               phd_log LOG_DEBUG "$numnodes in cluster."
+               if [ "$numnodes" = "2" ]; then
+                       phd_log LOG_DEBUG "manually setting two_node cluster"
+                       phd_cmd_exec "sed -i.bak 's/.*provider:.*corosync_votequorum/provider:corosync_votequorum\\ntwo_node:1/g' /etc/corosync/corosync.conf" "$nodes" 
+               fi
+        fi
 }
 
 pacemaker_fence_init()

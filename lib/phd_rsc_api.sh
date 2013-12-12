@@ -2,6 +2,36 @@
 
 #. ${PHDCONST_ROOT}/lib/phd_utils_api.sh
 
+phd_rsc_enable()
+{
+	local rsc=$1
+	local node=$2
+	local rc
+
+	phd_cmd_exec "pcs resource enable $rsc" "$node" > /dev/null 2>&1
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		phd_cmd_exec "pcs resource start $rsc" "$node" > /dev/null 2>&1
+		rc=$?
+	fi
+	return $?
+}
+
+phd_rsc_disable()
+{
+	local rsc=$1
+	local node=$2
+	local rc
+
+	phd_cmd_exec "pcs resource disable $rsc" "$node" > /dev/null 2>&1
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		phd_cmd_exec "pcs resource stop $rsc" "$node" > /dev/null 2>&1
+		rc=$?
+	fi
+	return $?
+}
+
 ##
 # Returns only top level resources (Excludes stonith resources)
 # For example, a group with 3 primitives, only the group id will be returned.
@@ -267,7 +297,7 @@ phd_rsc_stop_all()
 
 	phd_log LOG_DEBUG "stopping all resources. $rsc_list on node $node"
 	for rsc in $(echo $rsc_list); do
-		phd_cmd_exec "pcs resource disable $rsc" "$node"
+		phd_rsc_disable "$rsc" "$node"
 	done
 }
 
@@ -296,7 +326,7 @@ phd_rsc_start_all()
 
 	phd_log LOG_DEBUG "enabling all resources. $rsc_list"
 	for rsc in $(echo $rsc_list); do
-		phd_cmd_exec "pcs resource enable $rsc" "$node"
+		phd_rsc_enable "$rsc" "$node"
 	done
 }
 
@@ -344,6 +374,10 @@ phd_rsc_relocate()
 		return 1
 	fi
 	phd_cmd_exec "pcs resource clear $rsc" "$node"
+	if [ $? -ne 0 ]; then
+		phd_log LOG_ERR "'pcs resource clear' command failed for resource ($rsc)"
+		return 1
+	fi
 	phd_log LOG_NOTICE "Resource $rsc successfully relocated from node $cur_node to node $(phd_rsc_active_nodes $rsc $node)"
 	return 0
 }
