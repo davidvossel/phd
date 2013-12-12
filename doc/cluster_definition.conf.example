@@ -19,6 +19,8 @@
 ##
 
 ##
+# Fencing
+#
 # Setting up phd to automate complex fencing setups
 # can be accomplished using the 'fence_cmd' option.
 #
@@ -50,24 +52,17 @@
 # shared_storage=/dev/vdb /dev/vdc
 ##
 
-#==#==# Cluster Configuration Method Variables
-
 ##
-# Configuration Transports supported.
+# Transport Configuration
+#
 # All scenarios will require some form of remote transport to be available.
 # Set the prefered method here. This will default to ssh otherwise.
 #
+# Valid values are.
 # ssh = all nodes can talk to each other via ssh without requiring passwords
-# pcsd = all nodes are capable of communicating via pcsd
+# qarsh = all nodes are running qarshd
 #
 # Example:
-# transports=ssh
+# transport=qarsh
 ##
 
-##
-# Some scenarios will require use of puppet for configuration management.
-# When puppet is configured in the cluster, list the host or floating ip
-# associated with the puppet master instance.
-#
-# puppet_master=192.168.122.220
-##

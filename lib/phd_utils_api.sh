@@ -1,5 +1,6 @@
 #!/bin/bash
 . ${PHDCONST_ROOT}/lib/transport_ssh.sh
+. ${PHDCONST_ROOT}/lib/transport_qarsh.sh
 
 LOG_ERR="error"
 LOG_ERROR="error"
@@ -12,6 +13,26 @@ PHD_LOG_STDOUT=1
 PHD_TMP_DIR="/var/run/phd_scenario"
 
 LOG_UNAME=""
+PHD_TRANSPORT=""
+
+phd_detect_transport()
+{
+	if [ -z "$PHD_TRANSPORT" ]; then
+		PHD_TRANSPORT=$(definition_transport)
+
+		if [ -z "$PHD_TRANSPORT" ]; then
+			# default to ssh
+			PHD_TRANSPORT="ssh"
+		fi
+
+		case $PHD_TRANSPORT in
+		ssh|qarsh) : ;;
+		*) phd_exit_failure "Unknown Transport \"$PHD_TRANSPORT\". Valid values are ssh and qarsh" ;;
+		esac
+
+		phd_log LOG_NOTICE "Using $PHD_TRANSPORT as transport"
+	fi
+}
 
 phd_clear_vars()
 {
@@ -135,10 +156,14 @@ phd_cmd_exec()
 			phd_log LOG_EXEC "$output"
 		fi
 	else
-		# TODO - support multiple transports
 		for node in $(echo $nodes); do
-			phd_log LOG_EXEC "$node - $cmd"
-			output=$(phd_ssh_cmd_exec "$cmd" "$node" 2>&1)
+			phd_detect_transport
+			phd_log LOG_EXEC "$node($PHD_TRANSPORT) - $cmd"
+
+			case $PHD_TRANSPORT in
+			qarsh)	output=$(phd_qarsh_cmd_exec "$cmd" "$node" 2>&1) ;;
+			*)		output=$(phd_ssh_cmd_exec "$cmd" "$node" 2>&1) ;;
+			esac
 			rc=$?
 
 			if [ -n "$output" ]; then
@@ -161,12 +186,20 @@ phd_node_cp()
 	local nodes=$3
 	local permissions=$4
 	local node
+	local rc
 	
 	# TODO - support multiple transports
 	for node in $(echo $nodes); do
+		phd_detect_transport
 		phd_log LOG_DEBUG "copying file \"$src\" to node \"$node\" destination location \"$dest\""
-		phd_ssh_cp "$src" "$dest" "$node"
-		if [ $? -ne 0 ]; then
+
+		case $PHD_TRANSPORT in
+		qarsh)	phd_qarsh_cp "$src" "$dest" "$node" ;;
+		*)		phd_ssh_cp "$src" "$dest" "$node" ;;
+		esac
+		rc=$?
+		
+		if [ $rc -ne 0 ]; then
 			phd_log LOG_ERR "failed to copy file \"$src\" to node \"$node\" destination location \"$dest\""
 			return 1
 		fi

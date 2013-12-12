@@ -59,6 +59,11 @@ definition_shared_dev()
 	eval echo "\$${PHDENV_PREFIX}_shared_storage"
 }
 
+definition_transport()
+{
+	eval echo "\$${PHDENV_PREFIX}_transport"
+}
+
 definition_nodes()
 {
 	eval echo "\$${PHDENV_PREFIX}_nodes"
