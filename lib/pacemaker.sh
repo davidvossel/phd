@@ -89,6 +89,23 @@ pacemaker_cluster_stop()
 	done
 }
 
+# verify all nodes are active
+pacemaker_verify_nodes()
+{
+	local nodes=$(definition_nodes)
+	local node
+	local execnode=$(definition_node "1")
+
+	for node in $(echo $nodes); do
+		phd_cmd_exec "crm_mon -X | grep '$node.*online=.true' -q" "$execnode"
+		if [ $? -ne 0 ]; then
+			phd_log LOG_INFO "waiting for $node to come online"
+			return 1
+		fi
+	done
+	return 0
+}
+
 pacemaker_cluster_start()
 {
 	local nodes=$(definition_nodes)
@@ -113,7 +130,10 @@ pacemaker_cluster_start()
 		phd_log LOG_INFO "Waiting for pacemaker cluster to come up."
 		phd_cmd_exec "cibadmin -Q > /dev/null 2>&1" "$node"
 		if [ "$?" -eq 0 ]; then
-			break
+			pacemaker_verify_nodes
+			if [ "$?" -eq 0 ]; then
+				break
+			fi
 		fi
 		if [ $lapse_sec -ge $timeout ]; then
 			phd_exit_failure "Timed out waiting for the pacemaker cluster to come up."
