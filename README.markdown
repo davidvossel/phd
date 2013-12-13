@@ -25,6 +25,10 @@ Before phd can be used, you must be able to either ssh into all the nodes in the
 
 phd defaults to using ssh unless the 'transport=qarsh' variable is set in the /etc/phd/cluster_definition.conf file.
 
+## phd_exec tool
+
+The phd_exec tool is used to execute cluster scenarios (deployments) on the cluster defined in the /etc/phd/cluster_definition.conf file.  Run phd_exec -h for usage information.
+
 ## Example Apache Deployment
 Execute the example apache server on a three node cluster.  This is a good scenario to start with to test phd is working correctly.
 
