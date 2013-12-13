@@ -25,6 +25,10 @@ Before phd can be used, you must be able to either ssh into all the nodes in the
 
 phd defaults to using ssh unless the 'transport=qarsh' variable is set in the /etc/phd/cluster_definition.conf file.
 
+## FENCING
+
+Fencing devices are configured in the cluster_definition.conf file using the 'fence_cmd' option. Multiple entries of 'fence_cmd' can be used to define more complex fencing scenarios.  When no 'fence_cmd' options exist in the cluster definition, phd will automatically disable fencing allowing scenarios to continue to be executed. For more information on fencing, read the /etc/phd/cluster_definition.conf.example file.
+
 ## phd_exec tool
 
 The phd_exec tool is used to execute cluster scenarios (deployments) on the cluster defined in the /etc/phd/cluster_definition.conf file.  Run phd_exec -h for usage information.
