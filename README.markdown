@@ -16,8 +16,8 @@ Run 'phd_exec -h' see usage.
 
 I've made the repo I use for testing phd available.  The phd project has successfully been used in both fedora 20 and rhel6 based environments.
 
-wget -O /etc/yum.repos.d/vossel.repo http://davidvossel.com/repo/vossel-test.repo
-yum install phd
+* wget -O /etc/yum.repos.d/vossel.repo http://davidvossel.com/repo/vossel-test.repo
+* yum install phd
 
 ## SETUP
 
