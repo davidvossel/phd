@@ -12,9 +12,21 @@ An example cluster_definition file can be found in /etc/phd/cluster_definition.c
 
 Run 'phd_exec -h' see usage.
 
+## TEST REPO
+
+I've made the repo I use for testing phd available.  The phd project has successfully been used in both fedora 20 and rhel6 based environments.
+
+wget -O /etc/yum.repos.d/vossel.repo http://davidvossel.com/repo/vossel-test.repo
+yum install phd
+
+## SETUP
+
+Before phd can be used, you must be able to either ssh into all the nodes in the cluster without requiring passwords (using ssh keys) or have qarshd enabled. Qarshd is a quality assurance tool that should never be used in a production environment.
+
+phd defaults to using ssh unless the 'transport=qarsh' variable is set in the /etc/phd/cluster_definition.conf file.
+
 ## Example Apache Deployment
-Execute the example apache server on a three node cluster.
-NOTE, The node executing this script must be capable of ssh communication without passwords to the other nodes.
+Execute the example apache server on a three node cluster.  This is a good scenario to start with to test phd is working correctly.
 
 * echo "nodes=node1 node2 node3" > /etc/phd/cluster_definition.conf
 * echo "floating_ips=192.168.122.200" >> /etc/phd/cluster_definition.conf
@@ -22,7 +34,6 @@ NOTE, The node executing this script must be capable of ssh communication withou
 
 ## Example Apache deployment on shared storage
 Execute an apache server with the /var/www file living on shared storage.
-NOTE, The node executing this script must be capable of ssh communication without passwords to the other nodes.
 
 * echo "nodes=node1 node2 node3" > /etc/phd/cluster_definition.conf
 * echo "floating_ips=192.168.122.200" >> /etc/phd/cluster_definition.conf
@@ -30,8 +41,7 @@ NOTE, The node executing this script must be capable of ssh communication withou
 * phd_exec -s apache_shared_lvm.scenario
 
 ## Example NFS deployment on shared storage
-Execute an NFS deployment on top of shared storage
-NOTE, The node executing this script must be capable of ssh communication without passwords to the other nodes.
+Execute an NFS deployment on top of shared storage.
 
 * echo "nodes=node1 node2 node3" > /etc/phd/cluster_definition.conf
 * echo "floating_ips=192.168.122.200" >> /etc/phd/cluster_definition.conf
