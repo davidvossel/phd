@@ -94,7 +94,17 @@ END
 #!/bin/sh
 devices="$shared_dev"
 for dev in \$(echo \$devices); do
+	cat /proc/mounts | grep -e "^\${dev}.* /boot "    
+	if [ \$? -eq 0 ]; then
+		exit 2
+	fi
+
 	for vg in \$(pvs --noheadings \$dev | awk '{print \$2}'); do
+		cat /proc/mounts | grep "^/dev.*\${vg}-.* / "
+		if [ \$? -eq 0 ]; then
+			exit 2
+		fi
+
 		echo "removing \$vg"
 		vgremove -f \$vg
 		if [ \$? -ne 0 ]; then 
@@ -118,12 +128,21 @@ for dev in \$(echo \$devices); do
 		exit 1
 	fi
 done
+
+exit 0
+
 END
 
 	# we have to start corosync to get quorum before clvmd will start
 	phd_script_exec "$corosync_start" "$nodes"
 	phd_script_exec "$clvmd_start" "$nodes"
 	phd_script_exec "$umount_script" "$nodes"
+	if [ $? -eq 2 ]; then
+		phd_log LOG_ERR "Devices ($shared_dev) are associated with with the root filesystem. You really don't us to wipe these devices."
+		phd_script_exec "$clvmd_stop" "$nodes"
+		phd_exit_failure "Avoiding potential wipe of root filesystem"
+	fi
+	
 	phd_script_exec "$wipe_script" "$(definition_node 1)"
 	if [ $? -ne 0 ]; then
 		phd_exit_failure "failed to wipe shared storage devices"
