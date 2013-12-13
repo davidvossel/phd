@@ -4,6 +4,7 @@ phd_libdir = $(libexecdir)/$(PACKAGE_NAME)/lib
 
 phd_lib_SCRIPTS = definition.sh	\
 	pacemaker.sh	\
+	package.sh	\
 	phd_rsc_api.sh	\
 	phd_utils_api.sh	\
 	scenario_engine.sh	\

@@ -26,6 +26,7 @@
 . ${PHDCONST_ROOT}/lib/phd_utils_api.sh
 . ${PHDCONST_ROOT}/lib/pacemaker.sh
 . ${PHDCONST_ROOT}/lib/shared_storage.sh
+. ${PHDCONST_ROOT}/lib/package.sh
 
 SENV_PREFIX="PHD_SENV"
 SREQ_PREFIX="PHD_SREQ"
@@ -167,86 +168,18 @@ print_scenario()
 	return 0
 }
 
-scenario_custom_package_install()
-{
-	local package_dir=$(definition_package_dir)
-	local packages=""
-	local rpms=""
-	local entry=""
-	local nodes=$(scenario_install_nodes)
-	local node
-
-	if [ -z "$package_dir" ]; then
-		echo ""
-		return
-	fi
-
-
-	phd_cmd_exec "mkdir -p $PHD_TMP_DIR/phd_rpms/" "$nodes"
-
-	for entry in $(ls ${package_dir}*.rpm); do
-		packages="$packages $(rpm -qp -i $entry | grep -e 'Name' | sed 's/Name.*: //')"
-		rpms="$rpms $entry"
-		phd_node_cp "$entry" "$PHD_TMP_DIR/phd_rpms/" "$nodes"
-	done
-
-	if [ -z "$rpms" ]; then
-		return
-	fi
-
-	for node in $(echo $nodes); do
-		phd_log LOG_DEBUG "Installing custom packages '$packages' on node '$node'"
-		phd_cmd_exec "yum remove -y $packages >/dev/null 2>&1" "$node"
-		if [ $? -ne 0 ]; then
-			phd_exit_failure "Could not clean custom packages on \"$node\" before install"
-		fi
-	    phd_cmd_exec "yum install -y $PHD_TMP_DIR/phd_rpms/*.rpm > /dev/null 2>&1" "$node"
-		if [ $? -ne 0 ]; then
-			phd_exit_failure "Could not install custom packages on \"$node\""
-		fi
-	done
-	
-	export "${SENV_PREFIX}_custom_packages=$packages"
-}
-
 scenario_package_install()
 {
+	local nodes=$(scenario_install_nodes)
+	local custom_package_dir=$(definition_package_dir)
 	local packages=$(eval echo "\$${SREQ_PREFIX}_packages")
-	local package
-	local node
-	local custom_packages
-	
-	scenario_custom_package_install
-	custom_packages=$(eval echo "\$${SENV_PREFIX}_custom_packages")
 
-	# make sure not to try and install custom packages that overlap
-	# with the scenario packages
-    local unique=$(echo "$packages $custom_packages" | sed 's/\s/\n/g' | sort | uniq -u)
-	packages=$(echo "$packages $unique" | sed 's/\s/\n/g' | sort | uniq -d | tr '\n' ' ')
-	if [ -z "$packages" ]; then
-		phd_log LOG_NOTICE "Success: no package install required."
-		return 0
-	fi
+	# install custom packages from a directory
+	package_install_custom "$custom_package_dir"  "$nodes"
 
-	for node in $(scenario_install_nodes); do
-		phd_log LOG_NOTICE "Installing packages \"$packages\" on node \"$node\""
-		phd_cmd_exec "yum install -y $packages > /dev/null 2>&1" "$node"
-		if [ $? -ne 0 ]; then
-			phd_exit_failure "Could not install required packages on node \"$node\""
-		fi
+	# install required scenario packages
+	package_install "$packages" "$nodes"
 
-		# sanity check that everything actually worked
-		for package in $(echo $packages); do
-			phd_cmd_exec "yum list installed 2>&1 | grep -q '$package'" "$node"
-			if [ $? -ne 0 ]; then
-				phd_exit_failure "Could not install required package \"$package\" on node \"$node\""
-			fi
-		done
-	done
-
-	phd_log LOG_NOTICE "Success: Packages installed"
-
-	return 0
 }
 
 scenario_storage_destroy()
