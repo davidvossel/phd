@@ -60,11 +60,10 @@ scenario_script_add_env()
 	local tmp
 	local file
 
+	echo "export PHDCONST_ROOT=\"${PHD_TMP_DIR}\"" >> $script
 	for file in $(echo $api_files); do
 		file=$(basename $file)
 		echo ". ${PHD_TMP_DIR}/lib/${file}" >> $script
-		echo "export PHDCONST_ROOT=\"${PHD_TMP_DIR}\"" >> $script
-
 	done
 
 	while read tmp; do
@@ -96,7 +95,11 @@ scenario_unpack()
 
 	scenario_clean
 
-	while read line; do
+	local old_IFS=$IFS
+	IFS=$'\n'
+
+	for line in $(cat $1 | grep -v -e "[[:space:]]#" -e "^#")
+	do
 		cleaned=$(echo "$line" | tr -d ' ')
 		if [ "${cleaned:0:1}" = "=" ]; then
 			cleaned=$(echo "$cleaned" | tr -d '=')
@@ -132,7 +135,12 @@ scenario_unpack()
 				cur_script=${PHD_TMP_DIR}/${SCRIPT_PREFIX}${script_num}
 				export "${SCRIPT_PREFIX}_${script_num}=${cur_script}"
 				echo "#!/bin/bash" > ${cur_script}
+
+
+				
+				IFS=$old_IFS
 				scenario_script_add_env "$cur_script"
+				IFS=$'\n'
 				chmod 755 ${cur_script}
 			else
 				writing_script=0
@@ -159,7 +167,9 @@ scenario_unpack()
 			fi
 			export "${SENV_PREFIX}_${key}${script_num}=${cleaned_value}"
 		fi
-	done < <(cat $1 | grep -v -e "[[:space:]]#" -e "^#")
+	done
+
+	IFS=$old_IFS
 }
 
 print_scenario()
