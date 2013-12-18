@@ -154,6 +154,7 @@ pacemaker_cluster_clean()
 	if [ $? -eq 0 ]; then
 		phd_exit_failure "Unable to clear cluster cache. $output"
 	fi
+	phd_cmd_exec "mkdir /var/lib/pacemaker/cib /var/lib/pacemaker/cores /var/lib/pacemaker/blackbox /var/lib/pacemaker/pengine" "$nodes"
 }
 
 pacemaker_cluster_init()

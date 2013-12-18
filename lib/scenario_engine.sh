@@ -42,7 +42,7 @@ TEST_INDEX=0
 scenario_clean()
 {
 	rm -rf ${PHD_TMP_DIR}
-	mkdir -p $PHD_TMP_DIR
+	mkdir -p "$PHD_TMP_DIR/lib"
 	phd_clear_vars "$SENV_PREFIX"
 }
 
@@ -264,10 +264,14 @@ scenario_distribute_api()
 
 	for file in $(echo $api_files); do
 		file=$(basename $file)
+		# copy it remotely
 		phd_node_cp "${PHDCONST_ROOT}/lib/${file}" "${PHD_TMP_DIR}/lib/${file}" "$nodes" "755"
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Failed to distribute phd API to nodes. Exiting."
 		fi
+
+		# also copy it locally
+		cp "${PHDCONST_ROOT}/lib/${file}" "${PHD_TMP_DIR}/lib/${file}"
 	done
 	phd_log LOG_NOTICE "Success: API distributed to nodes ($nodes)"
 }

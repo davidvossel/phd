@@ -8,7 +8,7 @@ nodes=3
 floating_ips=1
 install_local=1
 packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs resource-agents fence-virt fence-agents
-cluster_destroy=1
+cluster_init=1
 
 ######################
 # Deployment Scripts #
@@ -20,7 +20,7 @@ cluster_destroy=1
 ##
 target=local
 ....
-nodename = $(crm_node -n)
+nodename=$(crm_node -n)
 for node in $(echo $PHD_ENV_nodes); do
 	if [ "$HOSTNAME" = "node" ]; then
 		echo "Must run the virt cts scenario on a node outside of the cluster"
