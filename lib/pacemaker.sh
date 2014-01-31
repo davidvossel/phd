@@ -164,7 +164,7 @@ pacemaker_cluster_init()
 
        # There is a pcs syntax change that results in us trying to
        # initialize the cluster in multiple ways.
-        phd_cmd_exec "pcs cluster setup --force --local --name phd-cluster $nodes > /dev/null 2>&1" "$nodes"
+        phd_cmd_exec "pcs cluster setup --force --local --name $cluster_name $nodes > /dev/null 2>&1" "$nodes"
         if [ "$?" -ne 0 ]; then
                phd_cmd_exec "pcs cluster setup --local $cluster_name $nodes > /dev/null 2>&1" "$nodes"
                if [ "$?" -ne 0 ]; then
