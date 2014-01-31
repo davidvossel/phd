@@ -1,0 +1,85 @@
+# GFS2 filesystem on shared storage with clvmd+dlm
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+shared_storage=1
+fence_cmd=1
+
+packages=pacemaker corosync pcs dlm lvm2 lvm2-cluster gfs2-utils resource-agents
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize lvm
+##
+target=all
+....
+lvmconf --enable-cluster
+....
+
+##
+# setup clvmd and dlm for clustered lvm management
+##
+target=$PHD_ENV_nodes1
+....
+tmpfile=mktemp
+pcs resource defaults resource-stickiness=100
+pcs cluster cib $tmpfile
+pcs -f $tmpfile resource create dlm controld op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+pcs -f $tmpfile resource create clvmd lsb:clvmd op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+pcs -f $tmpfile constraint order start dlm-clone then clvmd-clone
+pcs -f $tmpfile constraint colocation add clvmd-clone with dlm-clone
+pcs cluster cib-push $tmpfile
+
+phd_wait_pidof "clvmd" 90
+phd_rsc_verify_start_all 90
+....
+
+##
+# Make the cluster storage volume group
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+phd_rsc_verify_is_active_on clvmd-clone $PHD_ENV_nodes1 120
+
+pvcreate $dev
+vgcreate -cy cluster_vg $dev
+echo "y" | lvcreate -L 512M -n cluster_lv cluster_vg
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+lvdisplay
+
+mkfs.gfs2 -O -j4 -J 64 -p lock_dlm -t ${PHD_ENV_cluster_name}:gfs2-demo /dev/cluster_vg/cluster_lv
+if [ $? -ne 0 ]; then
+	echo "Failed to setup gfs2 filesystem"
+	exit 1
+fi
+....
+
+##
+# Make the lvm resources and floating ip
+##
+target=$PHD_ENV_nodes1
+....
+pcs cluster cib lvm-gfs2.cib
+pcs -f lvm-gfs2.cib resource create gfs2 Filesystem device=/dev/cluster_vg/cluster_lv directory=/gfs2share fstype=gfs2 op monitor interval=10s on-fail=fence clone interleave=true
+pcs -f lvm-gfs2.cib constraint order start clvmd-clone then gfs2-clone
+pcs -f lvm-gfs2.cib constraint colocation add gfs2-clone with clvmd-clone
+pcs cluster cib-push lvm-gfs2.cib
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
