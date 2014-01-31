@@ -33,6 +33,11 @@ definition_clean()
 	phd_clear_vars "$PHDENV_PREFIX"
 }
 
+definition_defaults()
+{
+	export "${PHDENV_PREFIX}_cluster_name=phd"
+}
+
 definition_unpack()
 {
 	local entry_num
@@ -45,6 +50,7 @@ definition_unpack()
 	fi
 
 	definition_clean
+	definition_defaults
 
 	while read line; do
 		local key=$(echo $line | awk -F= '{print $1}')
@@ -94,6 +100,11 @@ definition_nodes()
 definition_node()
 {
 	eval echo "\$${PHDENV_PREFIX}_nodes${1}"
+}
+
+definition_cluster_name()
+{
+	eval echo "\$${PHDENV_PREFIX}_cluster_name"
 }
 
 definition_meets_requirement()

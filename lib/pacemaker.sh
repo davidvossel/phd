@@ -160,12 +160,13 @@ pacemaker_cluster_clean()
 pacemaker_cluster_init()
 {
 	local nodes=$(definition_nodes)
+	local cluster_name=$(definition_cluster_name)
 
        # There is a pcs syntax change that results in us trying to
        # initialize the cluster in multiple ways.
         phd_cmd_exec "pcs cluster setup --force --local --name phd-cluster $nodes > /dev/null 2>&1" "$nodes"
         if [ "$?" -ne 0 ]; then
-               phd_cmd_exec "pcs cluster setup --local phd-cluster $nodes > /dev/null 2>&1" "$nodes"
+               phd_cmd_exec "pcs cluster setup --local $cluster_name $nodes > /dev/null 2>&1" "$nodes"
                if [ "$?" -ne 0 ]; then
                        phd_exit_failure "Could not setup corosync config for pacemaker cluster"
                fi
