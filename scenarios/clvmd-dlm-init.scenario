@@ -1,0 +1,65 @@
+# Creates clvmd+dlm scenario along with a clustered logical volume
+# cluster_vg/cluster_lv
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+shared_storage=1
+fence_cmd=1
+
+packages=pacemaker corosync pcs dlm lvm2 lvm2-cluster gfs2-utils resource-agents
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize lvm
+##
+target=all
+....
+lvmconf --enable-cluster
+....
+
+##
+# setup clvmd and dlm for clustered lvm management
+##
+target=$PHD_ENV_nodes1
+....
+tmpfile=mktemp
+pcs resource defaults resource-stickiness=100
+pcs cluster cib $tmpfile
+pcs -f $tmpfile resource create dlm controld op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+pcs -f $tmpfile resource create clvmd lsb:clvmd op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+pcs -f $tmpfile constraint order start dlm-clone then clvmd-clone
+pcs -f $tmpfile constraint colocation add clvmd-clone with dlm-clone
+pcs cluster cib-push $tmpfile
+
+phd_wait_pidof "clvmd" 90
+phd_rsc_verify_start_all 120
+....
+
+##
+# Make the cluster storage volume group
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+phd_rsc_verify_is_active_on clvmd-clone $PHD_ENV_nodes1 120
+
+pvcreate $dev
+vgcreate -cy cluster_vg $dev
+echo "y" | lvcreate -L 512M -n cluster_lv cluster_vg
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+lvdisplay
+....
+
