@@ -28,6 +28,7 @@ shared_storage_destroy()
 {
 	local nodes=$(definition_nodes)
 	local corosync_start="$PHD_TMP_DIR/PHD_STORAGE_COROSYNC_START"
+	local corosync_stop="$PHD_TMP_DIR/PHD_STORAGE_COROSYNC_STOP"
 	local clvmd_start="$PHD_TMP_DIR/PHD_STORAGE_CLVMD_START"
 	local clvmd_stop="$PHD_TMP_DIR/PHD_STORAGE_CLVMD_STOP"
 	local umount_script="$PHD_TMP_DIR/PHD_STORAGE_UMOUNT"
@@ -43,6 +44,18 @@ cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
 if [ \$? -eq 0 ]; then
 	service corosync start
 	service dlm start
+	sleep 1
+fi
+END
+
+
+	cat <<- END > $corosync_stop
+#!/bin/sh
+
+cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
+if [ \$? -eq 0 ]; then
+	service dlm stop
+	service corosync stop
 	sleep 1
 fi
 END
@@ -64,9 +77,6 @@ cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
 if [ \$? -eq 0 ]; then
 	echo "stopping clvmd"
 	service clvmd stop
-	service dlm stop
-	service corosync stop
-	lvmconf --disable-cluster
 fi
 END
 
@@ -148,5 +158,6 @@ END
 		phd_exit_failure "failed to wipe shared storage devices"
 	fi
 	phd_script_exec "$clvmd_stop" "$nodes"
+	phd_script_exec "$corosync_stop" "$nodes"
 }
 
