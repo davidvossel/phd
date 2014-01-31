@@ -46,7 +46,7 @@ Execute an apache server with the /var/www file living on shared storage.
 * echo "nodes=node1 node2 node3" > /etc/phd/cluster_definition.conf
 * echo "floating_ips=192.168.122.200" >> /etc/phd/cluster_definition.conf
 * echo "shared_storage=/dev/vdb" >> /etc/phd/cluster_definition.conf
-* phd_exec -s apache_shared_lvm.scenario
+* phd_exec -s apache-shared-lvm.scenario
 
 ## Example NFS deployment on shared storage
 Execute an NFS deployment on top of shared storage.
@@ -54,5 +54,5 @@ Execute an NFS deployment on top of shared storage.
 * echo "nodes=node1 node2 node3" > /etc/phd/cluster_definition.conf
 * echo "floating_ips=192.168.122.200" >> /etc/phd/cluster_definition.conf
 * echo "shared_storage=/dev/vdb" >> /etc/phd/cluster_definition.conf
-* phd_exec -s nfs_shared_clvmd.scenario
+* phd_exec -s nfs-shared-clvmd.scenario
 
