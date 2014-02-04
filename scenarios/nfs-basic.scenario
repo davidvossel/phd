@@ -1,0 +1,115 @@
+# NFS server
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+shared_storage=1
+floating_ips=1
+
+packages=pacemaker corosync pcs nfs-utils resource-agents
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize lvm
+##
+target=all
+....
+lvmconf --enable-cluster
+systemctl disable nfs-server
+systemctl stop nfs-server
+systemctl disable nfs-lock
+systemctl stop nfs-lock
+....
+
+##
+# Make the cluster storage volume group
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+mkfs.ext4 $dev
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+....
+
+##
+# Make the filesystem resources and floating ip
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+pcs resource create nfsshare Filesystem device=${dev} directory=/nfsshare fstype=ext4
+pcs resource create nfs_ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24
+pcs resource group add nfs-group nfsshare nfs_ip
+# put the nfs group on a node we can predict,
+# this just helps automate NFS share setup, but will be removed later.
+pcs constraint location nfs-group prefers $PHD_ENV_nodes1
+....
+
+
+##
+# NFS share setup
+##
+target=$PHD_ENV_nodes1
+....
+suffix=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+
+# Now that our mounts are up, setup the client folders
+mkdir /nfsshare/clientdata
+touch /nfsshare/clientdata/clientsharefile
+
+# Remove that temporary location constraint now that the folders
+# are initialized on the shared storage mount
+pcs constraint location remove location-nfs-group-${PHD_ENV_nodes1}-INFINITY
+
+pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo nfs_ip=$PHD_ENV_floating_ips1
+pcs resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync directory=/nfsshare/clientdata fsid=0
+pcs resource group add nfs-group nfs-daemon nfs-export
+....
+
+######################
+#    Test Scripts    #
+######################
+= TESTS =
+
+target=$PHD_ENV_nodes1
+....
+# Verify all resources have started.
+phd_rsc_verify_start_all 60
+phd_test_assert $? 0 "Failed to start all resources"
+
+# Verify all resources can stop and start
+phd_rsc_stop_all
+phd_test_assert $? 0 "Failed to disable resources"
+phd_rsc_verify_stop_all 60
+phd_test_assert $? 0 "Failed to verify all resources stopped"
+phd_rsc_start_all
+phd_test_assert $? 0 "Failed to enable all resources"
+phd_rsc_verify_start_all 60
+phd_test_assert $? 0 "Failed to restart all resources"
+
+# Verify nfs-group can relocate
+phd_rsc_relocate nfs-group 60
+phd_test_assert $? 0 "Failed to relocate nfs-group"
+
+# Verify nfs-daemon can recover after failure
+phd_rsc_verify_start_all 60
+phd_test_assert $? 0 "Failed to verify all resources are started before performing recovery test."
+phd_rsc_failure_recovery nfs-daemon 60
+phd_test_assert $? 0 "Failed to recover nfs-daemon after failure"
+....
