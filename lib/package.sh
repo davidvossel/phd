@@ -43,6 +43,10 @@ package_install_custom()
 
 	phd_cmd_exec "mkdir -p $PHD_TMP_DIR/phd_rpms/" "$nodes"
 
+	if ! [ -d "$package_dir" ]; then
+			phd_exit_failure "Could not install custom packages, $package_dir is not a directory."
+	fi
+
 	for entry in $(ls ${package_dir}*.rpm); do
 		packages="$packages $(rpm -qp -i $entry | grep -e 'Name' | sed 's/Name.*: //')"
 		rpms="$rpms $entry"
