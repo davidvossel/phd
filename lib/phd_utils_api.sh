@@ -34,7 +34,7 @@ LOG_DEBUG="debug"
 
 PHD_LOG_LEVEL=2
 PHD_LOG_STDOUT=1
-PHD_TMP_DIR="/var/run/phd_scenario"
+PHD_TMP_DIR="/var/lib/phd_state/"
 
 LOG_UNAME=""
 PHD_TRANSPORT=""
@@ -139,10 +139,11 @@ phd_log()
 phd_set_exec_dir()
 {
 	PHD_TMP_DIR=$1
+
+	phd_log LOG_NOTICE "SCENARIO STATE DATA LOCATION $PHD_TMP_DIR "
 	if [ -z "$PHD_LOG_FILE" ]; then
 		phd_set_log_file "${PHD_TMP_DIR}/phd.log"
 	fi
-	phd_log LOG_NOTICE "logfile=$PHD_LOG_FILE"
 }
 
 phd_enable_stdout_log()
@@ -158,7 +159,7 @@ phd_set_log_level()
 phd_set_log_file()
 {
 	PHD_LOG_FILE="$1"
-	phd_log LOG_NOTICE "Writing to logfile at $1"
+	phd_log LOG_NOTICE "LOG FILES ARE AT $1"
 }
 
 phd_cmd_exec()
@@ -305,7 +306,7 @@ phd_verify_connection()
 	for node in $(echo $nodes); do
 		phd_cmd_exec "ls > /dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
-			phd_exit_failure "Unable to establish connection with node \"$node\""
+			phd_exit_failure "Unable to establish connection with node \"$node\"."
 		fi
 		phd_log LOG_DEBUG "Node ($node) is accessible"
 	done

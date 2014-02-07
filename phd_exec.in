@@ -32,6 +32,11 @@ exec_dir="@localstatedir@/lib/phd"
 definition="@sysconfdir@/phd/cluster_definition.conf"
 scenario_dir="@libexecdir@/@PACKAGE@/scenarios"
 
+if ! [ -w $exec_dir ]; then
+       exec_dir="$HOME/phd_state"
+       mkdir -p $exec_dir
+fi
+
 . ${PHDCONST_ROOT}/lib/transport_ssh.sh
 . ${PHDCONST_ROOT}/lib/phd_utils_api.sh
 . ${PHDCONST_ROOT}/lib/scenario_engine.sh
