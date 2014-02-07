@@ -24,5 +24,6 @@ target=all
 
 target=$PHD_ENV_nodes1
 ....
+/usr/share/pacemaker/tests/cts/lxc_autogen.sh -R
 /usr/share/pacemaker/tests/cts/lxc_autogen.sh -g -a -A -s -c 200
 ....
