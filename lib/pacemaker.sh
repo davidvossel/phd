@@ -51,12 +51,6 @@ pacemaker_cluster_stop()
 			phd_cmd_exec "yum install -y pcs > /dev/null 2>&1" "$node"
 		fi
 
-		# make sure pacemaker remote is down everywhere
-		phd_cmd_exec "service pacemaker_remote status > /dev/null 2>&1" "$node"
-		if [ $? -eq 0 ]; then
-			phd_cmd_exec "service pacemaker_remote stop > /dev/null 2>&1" "$node"
-		fi
-
 		# if pacemaker is down, still execut pcs stop to make
 		# sure corosync is down
 		phd_cmd_exec "pcs cluster status > /dev/null 2>&1" "$node"
@@ -80,6 +74,12 @@ pacemaker_cluster_stop()
 			if [ $? -eq 0 ]; then
 				rsc_stopped=1
 			fi
+		fi
+
+		# make sure pacemaker remote is down everywhere
+		phd_cmd_exec "service pacemaker_remote status > /dev/null 2>&1" "$node"
+		if [ $? -eq 0 ]; then
+			phd_cmd_exec "service pacemaker_remote stop > /dev/null 2>&1" "$node"
 		fi
 
 		phd_log LOG_INFO "Stopping pacemaker on node $node"

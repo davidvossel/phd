@@ -5,7 +5,7 @@
 #################################
 = REQUIREMENTS =
 nodes=3
-packages=pacemaker pacemaker_remote corosync pcs httpd wget
+packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs httpd wget
 cluster_init=1
 
 ######################
@@ -20,11 +20,18 @@ target=$PHD_ENV_nodes1
 ....
 service pacemaker stop
 service corosync stop
+
+mkdir -p /etc/pacemaker
+rm -f /etc/pacemaker/authkey
+echo "this is a pretty insecure key, but at least it is predictable" > /etc/pacemaker/authkey
 service pacemaker_remote start
 ....
 
 target=all
 ....
+mkdir -p /etc/pacemaker
+rm -f /etc/pacemaker/authkey
+echo "this is a pretty insecure key, but at least it is predictable" > /etc/pacemaker/authkey
 crm_node --force -R $PHD_ENV_nodes1
 exit 0
 ....
