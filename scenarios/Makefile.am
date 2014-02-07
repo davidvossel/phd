@@ -11,4 +11,5 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	nfs-basic.scenario	\
 	nfs-shared-clvmd.scenario	\
 	slapd-basic.scenario	\
+	remote-baremetal-basic.scenario	\
 	wipe-storage.scenario

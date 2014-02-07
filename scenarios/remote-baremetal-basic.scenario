@@ -1,0 +1,52 @@
+# Example baremetal remote-node scenario
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=3
+packages=pacemaker pacemaker_remote corosync pcs httpd wget
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# shutdown the cluster on node1 and start pacemaker remote
+##
+target=$PHD_ENV_nodes1
+....
+service pacemaker stop
+service corosync stop
+service pacemaker_remote start
+....
+
+target=all
+....
+crm_node --force -R $PHD_ENV_nodes1
+exit 0
+....
+
+##
+# make node1 a baremetal remote-node
+##
+target=$PHD_ENV_nodes2
+....
+pcs resource create $PHD_ENV_nodes1 ocf:pacemaker:remote op monitor interval=10s
+....
+
+##
+# Add dummy resources
+##
+target=$PHD_ENV_nodes2
+....
+pcs resource create FAKE1 Dummy op monitor interval=10s
+pcs resource create FAKE2 Dummy op monitor interval=10s
+pcs resource create FAKE3 Dummy op monitor interval=10s
+pcs resource create FAKE4 Dummy op monitor interval=10s
+pcs resource create FAKE5 Dummy op monitor interval=10s
+pcs resource create FAKE6 Dummy op monitor interval=10s
+pcs resource create FAKE7 Dummy op monitor interval=10s
+....
