@@ -33,7 +33,7 @@ pacemaker_kill_processes()
 
 	phd_log LOG_DEBUG "Killing processes on $node"
 
-	phd_cmd_exec "killall -q -9 corosync aisexec heartbeat pacemakerd pacemaker-remoted ccm stonithd ha_logd lrmd crmd pengine attrd pingd mgmtd cib fenced dlm_controld gfs_controld" "$node"
+	phd_cmd_exec "killall -q -9 corosync aisexec heartbeat pacemakerd pacemaker_remoted ccm stonithd ha_logd lrmd crmd pengine attrd pingd mgmtd cib fenced dlm_controld gfs_controld" "$node"
 }
 
 pacemaker_cluster_stop()
@@ -49,6 +49,12 @@ pacemaker_cluster_stop()
 		phd_cmd_exec "yum list installed 2>&1 | grep 'grep pcs'" "$node"
 		if [ $? -ne 0 ]; then
 			phd_cmd_exec "yum install -y pcs > /dev/null 2>&1" "$node"
+		fi
+
+		# make sure pacemaker remote is down everywhere
+		phd_cmd_exec "service pacemaker_remote status > /dev/null 2>&1" "$node"
+		if [ $? -eq 0 ]; then
+			phd_cmd_exec "service pacemaker_remote stop > /dev/null 2>&1" "$node"
 		fi
 
 		# if pacemaker is down, still execut pcs stop to make
