@@ -8,6 +8,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	cts-virt.scenario	\
 	example.scenario	\
 	gfs2-clvmd.scenario	\
+	lxc-container-node.scenario \
 	nfs-basic.scenario	\
 	nfs-shared-clvmd.scenario	\
 	slapd-basic.scenario	\

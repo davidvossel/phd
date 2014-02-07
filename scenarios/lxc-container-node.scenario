@@ -1,0 +1,28 @@
+# Example lxc container node
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs libvirt libvirt-daemon-lxc
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# shutdown the cluster on node1 and start pacemaker remote
+##
+target=all
+....
+/usr/share/pacemaker/tests/cts/lxc_autogen.sh -v
+....
+
+
+target=$PHD_ENV_nodes1
+....
+/usr/share/pacemaker/tests/cts/lxc_autogen.sh -g -a -m -s -c 2
+....
