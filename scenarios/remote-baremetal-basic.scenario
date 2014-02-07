@@ -5,7 +5,7 @@
 #################################
 = REQUIREMENTS =
 nodes=3
-packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs httpd wget
+packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs
 cluster_init=1
 
 ######################
