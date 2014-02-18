@@ -23,6 +23,30 @@
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
 
+# make all our nodes use a consistent locking type
+verify_locking_type()
+{
+	local nodes=$(definition_nodes)
+	local type3=0
+	local type1=0
+
+	for node in $(echo $nodes); do
+		phd_cmd_exec "lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1" $node
+		if [ $? -eq 0 ]; then
+			type3=1
+		else 
+			type1=1
+		fi
+	done
+
+	if [ $type1 -ne $type3 ];  then
+		# not a mix of type1 and type3, so we are good
+		return
+	fi
+
+	# if there is a mix, force all the nodes to use type3
+	phd_cmd_exec "lvmconf --enable-cluster" "$nodes"
+}
 
 shared_storage_destroy()
 {
@@ -43,7 +67,7 @@ shared_storage_destroy()
 export OCF_ROOT=/usr/lib/ocf
 export OCF_RESKEY_CRM_meta_timeout=60000
 
-lvm dumpconfig global/locking_type | grep 'locking_type=3'
+lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	service corosync start
 	/usr/lib/ocf/resource.d/pacemaker/controld start
@@ -56,7 +80,7 @@ END
 export OCF_ROOT=/usr/lib/ocf
 export OCF_RESKEY_CRM_meta_timeout=60000
 
-lvm dumpconfig global/locking_type | grep 'locking_type=3'
+lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	/usr/lib/ocf/resource.d/pacemaker/controld stop
 	service corosync stop
@@ -69,7 +93,7 @@ END
 export OCF_ROOT=/usr/lib/ocf
 export OCF_RESKEY_CRM_meta_timeout=60000
 
-lvm dumpconfig global/locking_type | grep 'locking_type=3'
+lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	echo "starting clvmd"
 	/usr/lib/ocf/resource.d/heartbeat/clvmd start
@@ -80,7 +104,7 @@ END
 export OCF_ROOT=/usr/lib/ocf
 export OCF_RESKEY_CRM_meta_timeout=60000
 
-lvm dumpconfig global/locking_type | grep 'locking_type=3'
+lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	echo "stopping clvmd"
 	/usr/lib/ocf/resource.d/heartbeat/clvmd stop
@@ -149,6 +173,9 @@ done
 exit 0
 
 END
+
+	# set consistent lvm locking type across cluster
+	verify_locking_type
 
 	# we have to start corosync to get quorum before clvmd will start
 	phd_script_exec "$corosync_start" "$nodes"
