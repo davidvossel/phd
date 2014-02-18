@@ -40,21 +40,25 @@ shared_storage_destroy()
 	cat <<- END > $corosync_start
 #!/bin/sh
 
+export OCF_ROOT=/usr/lib/ocf
+export OCF_RESKEY_CRM_meta_timeout=60000
+
 cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
 if [ \$? -eq 0 ]; then
 	service corosync start
-	service dlm start
-	sleep 1
+	/usr/lib/ocf/resource.d/pacemaker/controld start
 fi
 END
 
 
 	cat <<- END > $corosync_stop
 #!/bin/sh
+export OCF_ROOT=/usr/lib/ocf
+export OCF_RESKEY_CRM_meta_timeout=60000
 
 cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
 if [ \$? -eq 0 ]; then
-	service dlm stop
+	/usr/lib/ocf/resource.d/pacemaker/controld stop
 	service corosync stop
 	sleep 1
 fi
@@ -62,21 +66,24 @@ END
 
 	cat <<- END > $clvmd_start
 #!/bin/sh
+export OCF_ROOT=/usr/lib/ocf
+export OCF_RESKEY_CRM_meta_timeout=60000
 
 cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
 if [ \$? -eq 0 ]; then
 	echo "starting clvmd"
-	service clvmd start
-	sleep 1
+	/usr/lib/ocf/resource.d/heartbeat/clvmd start
 fi
 END
 	cat <<- END > $clvmd_stop
 #!/bin/sh
+export OCF_ROOT=/usr/lib/ocf
+export OCF_RESKEY_CRM_meta_timeout=60000
 
 cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
 if [ \$? -eq 0 ]; then
 	echo "stopping clvmd"
-	service clvmd stop
+	/usr/lib/ocf/resource.d/heartbeat/clvmd stop
 fi
 END
 

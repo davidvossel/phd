@@ -194,8 +194,15 @@ scenario_package_install()
 
 scenario_storage_destroy()
 {
+	local cluster_init=$(eval echo "\$${SREQ_PREFIX}_cluster_init")
 	local wipe=$(eval echo "\$${SREQ_PREFIX}_clean_shared_storage")
 	local shared_dev=$(definition_shared_dev)
+
+	# since wiping storage involves the dlm and clvmd, we need to init
+	# corosync to perform this operation
+	if [ "$cluster_init" -eq "1" ]; then
+		pacemaker_cluster_init
+	fi
 
 	if [ -z "$wipe" ]; then
 		phd_log LOG_NOTICE "Success: Skipping."

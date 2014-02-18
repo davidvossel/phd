@@ -33,6 +33,8 @@ pacemaker_kill_processes()
 
 	phd_log LOG_DEBUG "Killing processes on $node"
 
+	phd_cmd_exec "service clvmd stop" "$node"
+	phd_cmd_exec "service dlm_controld stop" "$node"
 	phd_cmd_exec "killall -q -9 corosync aisexec heartbeat pacemakerd pacemaker_remoted ccm stonithd ha_logd lrmd crmd pengine attrd pingd mgmtd cib fenced dlm_controld gfs_controld" "$node"
 }
 
