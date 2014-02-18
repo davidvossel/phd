@@ -43,7 +43,7 @@ shared_storage_destroy()
 export OCF_ROOT=/usr/lib/ocf
 export OCF_RESKEY_CRM_meta_timeout=60000
 
-cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
+lvm dumpconfig global/locking_type | grep 'locking_type=3'
 if [ \$? -eq 0 ]; then
 	service corosync start
 	/usr/lib/ocf/resource.d/pacemaker/controld start
@@ -56,7 +56,7 @@ END
 export OCF_ROOT=/usr/lib/ocf
 export OCF_RESKEY_CRM_meta_timeout=60000
 
-cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
+lvm dumpconfig global/locking_type | grep 'locking_type=3'
 if [ \$? -eq 0 ]; then
 	/usr/lib/ocf/resource.d/pacemaker/controld stop
 	service corosync stop
@@ -69,7 +69,7 @@ END
 export OCF_ROOT=/usr/lib/ocf
 export OCF_RESKEY_CRM_meta_timeout=60000
 
-cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
+lvm dumpconfig global/locking_type | grep 'locking_type=3'
 if [ \$? -eq 0 ]; then
 	echo "starting clvmd"
 	/usr/lib/ocf/resource.d/heartbeat/clvmd start
@@ -80,7 +80,7 @@ END
 export OCF_ROOT=/usr/lib/ocf
 export OCF_RESKEY_CRM_meta_timeout=60000
 
-cat /etc/lvm/lvm.conf | grep -e "^[[:space:]]*locking_type.*3"
+lvm dumpconfig global/locking_type | grep 'locking_type=3'
 if [ \$? -eq 0 ]; then
 	echo "stopping clvmd"
 	/usr/lib/ocf/resource.d/heartbeat/clvmd stop
