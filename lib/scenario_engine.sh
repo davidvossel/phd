@@ -198,12 +198,6 @@ scenario_storage_destroy()
 	local wipe=$(eval echo "\$${SREQ_PREFIX}_clean_shared_storage")
 	local shared_dev=$(definition_shared_dev)
 
-	# since wiping storage involves the dlm and clvmd, we need to init
-	# corosync to perform this operation
-	if [ "$cluster_init" -eq "1" ]; then
-		pacemaker_cluster_init
-	fi
-
 	if [ -z "$wipe" ]; then
 		phd_log LOG_NOTICE "Success: Skipping."
 		return
@@ -218,6 +212,12 @@ scenario_storage_destroy()
 		phd_exit_failure "Could not clear shared storage, cluster definition contains no shared storage."
 	fi
 	
+	# since wiping storage involves the dlm and clvmd, we need to init
+	# corosync to perform this operation
+	if [ "$cluster_init" -eq "1" ]; then
+		pacemaker_cluster_init
+	fi
+
 	shared_storage_destroy
 	phd_log LOG_NOTICE "Success: Shared storage wiped"
 }

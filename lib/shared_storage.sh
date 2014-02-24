@@ -96,7 +96,7 @@ export OCF_RESKEY_CRM_meta_timeout=60000
 lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	echo "starting clvmd"
-	/usr/lib/ocf/resource.d/heartbeat/clvmd start
+	/usr/lib/ocf/resource.d/heartbeat/clvm start
 fi
 END
 	cat <<- END > $clvmd_stop
@@ -107,7 +107,7 @@ export OCF_RESKEY_CRM_meta_timeout=60000
 lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	echo "stopping clvmd"
-	/usr/lib/ocf/resource.d/heartbeat/clvmd stop
+	/usr/lib/ocf/resource.d/heartbeat/clvm stop
 fi
 END
 
