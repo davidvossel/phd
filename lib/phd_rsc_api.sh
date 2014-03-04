@@ -450,7 +450,7 @@ phd_rsc_failure_recovery()
 	fi
 
 	# clear failcount
-	phd_cmd_exec "pcs resource failcount reset $rsc $cur_node"
+	phd_cmd_exec "crm_resource -C -r  $rsc -N $cur_node"
 
 	# fail rsc
 	phd_rsc_fail "$rsc" "$cur_node" "$node"
@@ -475,6 +475,8 @@ phd_rsc_failure_recovery()
 		return 1
 	fi
 
+	# clear failcount
+	phd_cmd_exec "crm_resource -C -r  $rsc -N $cur_node"
 	return 0
 }
 
