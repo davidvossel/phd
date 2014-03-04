@@ -14,7 +14,7 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp \
 			  autoheader automake autoconf libtool libtoolize \
 			  ltmain.sh
 
-SUBDIRS	= lib scenarios environment doc
+SUBDIRS	= lib tests scenarios environment doc
 
 ACLOCAL_AMFLAGS		= -I m4
 

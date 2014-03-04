@@ -242,13 +242,17 @@ phd_script_exec()
 	local dir=$(dirname $script)
 	local nodes=$2
 	local node
+	local rc
 
 	for node in $(echo $nodes); do
 		phd_log LOG_DEBUG "executing script \"$script\" on node \"$node\""		
 		phd_cmd_exec "mkdir -p $dir" "$node" > /dev/null 2>&1
 		phd_node_cp "$script" "$script" "$node" "755" > /dev/null 2>&1
-		phd_cmd_exec "$script" "$node"
+		output=$(phd_cmd_exec "$script" "$node")
+		rc=$?
+		echo "$output" | sed 's/ LOG_/\nLOG_/g'
 	done
+	return $rc
 }
 
 phd_exit_failure()
@@ -314,7 +318,7 @@ phd_verify_connection()
 
 phd_random_node()
 {
-	local nodes=$(definition_transport)
+	local nodes=$(definition_nodes)
 	local num_nodes=$(echo "$nodes" | wc -w)
 	local ran_node_index=$(( ($RANDOM % $num_nodes) + 1 ))
 

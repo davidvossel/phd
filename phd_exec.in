@@ -59,6 +59,7 @@ function helptext() {
 	echo "-l, --list-scenarios     List installed scenario files."
 	echo "-d, --definition         Custom definition file location. Defaults to $definition"
 	echo "-v, --verify-definition  Verify cluster definition can run the scenario file"
+	echo "-i, --test-iterations    Number of test iterations to run"
 	echo "-t, --run-tests          Deploy scenario and run scenario tests after deployment."
 	echo "-o, --run-tests-only     Only run tests on deployment." 
 	echo "-f, --log-file           Custom logfile location."
@@ -73,11 +74,14 @@ check_only=0
 tests=0
 log_file="$exec_dir/phd.log"
 only_tests=0
+test_iter=10
+
 while true ; do
 	case "$1" in
 	--help|-h|-\?) helptext 0;;
 	-p|--print-env) print_env=1; shift;;
 	-v|--verify)     check_only=1; shift;;
+	-i|--test-iterations)  test_iter=$2; shift; shift;;
 	-t|--run-tests)  tests=1; shift;;
 	-o|--run-tests-only)  only_tests=1; shift;;
 	-f|--log-file)  log_file=$2; shift; shift;;
@@ -127,11 +131,11 @@ if [ $check_only -eq 1 ]; then
 fi
 
 if [ $only_tests -eq 1 ]; then
-	scenario_exec_tests
+	scenario_exec_tests "$test_iter"
 	exit $?
 fi
 
 scenario_exec
 if [ $tests -eq 1 ]; then
-	scenario_exec_tests
+	scenario_exec_tests "$test_iter"
 fi

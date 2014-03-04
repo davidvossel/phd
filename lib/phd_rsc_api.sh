@@ -491,14 +491,19 @@ phd_rsc_random()
 phd_rsc_random_moveable()
 {
 	local node="$1"
-	local raw_primitive_filter="sed \"s/.*primitive\\[@id='//g\" | sed \"s/'\\]//g\""
-	local raw_group_filter="sed \"s/.*primitive\\[@id='//g\" | sed \"s/'\\]//g\""
 	local cmd_group="cibadmin  -Q --local --xpath \"/cib/configuration/resources/group/primitive\" --node-path"
 	local cmd_primitive="cibadmin -Q --local --xpath \"/cib/configuration/resources/primitive[@class!='stonith']\" --node-path"
 	local rsc_list
+	local tmp
 
-	rsc_list=$(phd_cmd_exec "$cmd_group")
-	rsc_list="$rsc_list $(phd_cmd_exec "$cmd_primitive")"
+	tmp=$(phd_cmd_exec "$cmd_group")
+	if [ $? -eq 0 ]; then
+		rsc_list=$tmp
+	fi
+	tmp=$(phd_cmd_exec "$cmd_primitive")
+	if [ $? -eq 0 ]; then
+		rsc_list="$rsc_list $tmp"
+	fi
 
 	local num_rscs=$(echo "$rsc_list" | wc -w)
 
@@ -507,7 +512,6 @@ phd_rsc_random_moveable()
 	fi
 
 	local ran_rsc_index=$(( ($RANDOM % $num_rscs) + 1 ))
-
-	echo "$rsc_list" | cut -d ' ' -f $ran_rsc_index
+	echo "$rsc_list" | cut -d ' ' -f $ran_rsc_index  | sed "s/.*primitive\\[@id='//g" | sed "s/'\\]//g"
 }
 

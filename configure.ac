@@ -91,6 +91,7 @@ Makefile \
 phd_exec \
 lib/Makefile	\
 scenarios/Makefile	\
+tests/Makefile	\
 environment/Makefile	\
 doc/Makefile	\
 )

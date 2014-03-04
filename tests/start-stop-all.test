@@ -1,5 +1,3 @@
-target=$PHD_ENV_nodes1
-....
 # Verify all resources have started before starting
 phd_rsc_start_all
 phd_rsc_verify_start_all 60
@@ -16,4 +14,3 @@ phd_rsc_start_all
 phd_test_assert $? 0 "Failed to enable all resources"
 phd_rsc_verify_start_all 60
 phd_test_assert $? 0 "Failed to restart all resources"
-....

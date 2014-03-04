@@ -35,9 +35,6 @@ SCRIPT_PREFIX="PHD_SCPT"
 SEC_REQ="REQUIREMENTS"
 SEC_LOCAL="LOCAL_VARIABLES"
 SEC_SCRIPTS="SCRIPTS"
-SEC_TESTS="TESTS"
-
-TEST_INDEX=0
 
 scenario_clean()
 {
@@ -85,6 +82,23 @@ scenario_install_nodes()
 	fi
 }
 
+scenario_generate_tests()
+{
+	local tests=$(ls ${PHDCONST_ROOT}/tests/*)
+	local filepath
+	local file
+
+	mkdir -p "${PHD_TMP_DIR}/tests/"
+
+	for filepath in $(echo $tests); do
+		file=$(basename $filepath)
+		scenario_script_add_env "${PHD_TMP_DIR}/tests/${file}"
+		echo "### start of test ###"  >> ${PHD_TMP_DIR}/tests/${file}
+		cat $filepath >> ${PHD_TMP_DIR}/tests/${file}
+		chmod 755 ${PHD_TMP_DIR}/tests/${file}
+	done
+}
+
 scenario_unpack()
 {
 	local section=""
@@ -106,7 +120,7 @@ scenario_unpack()
 		fi
 
 		case $cleaned in
-		$SEC_REQ|$SEC_LOCAL|$SEC_SCRIPTS|$SEC_TESTS)
+		$SEC_REQ|$SEC_LOCAL|$SEC_SCRIPTS)
 			section=$cleaned
 			continue ;;
 		*) : ;;
@@ -119,11 +133,6 @@ scenario_unpack()
 		$SEC_LOCAL)
 			export "${SENV_PREFIX}_$cleaned"
 			continue ;;
-		$SEC_TESTS)
-			# this is the script index that separates
-			# the deployment from the tests
-			TEST_INDEX=$script_num
-		;;
 		$SEC_SCRIPTS) : ;;
 		*) : ;;
 		esac
@@ -135,8 +144,6 @@ scenario_unpack()
 				cur_script=${PHD_TMP_DIR}/${SCRIPT_PREFIX}${script_num}
 				export "${SCRIPT_PREFIX}_${script_num}=${cur_script}"
 				echo "#!/bin/bash" > ${cur_script}
-
-
 				
 				IFS=$old_IFS
 				scenario_script_add_env "$cur_script"
@@ -170,6 +177,8 @@ scenario_unpack()
 	done
 
 	IFS=$old_IFS
+
+	scenario_generate_tests
 }
 
 print_scenario()
@@ -298,20 +307,12 @@ scenario_environment_defaults()
 
 scenario_script_exec()
 {
-	local execute_tests=$1
 	local script_num=1
 	local script=""
 	local nodes=""
 	local node=""
 	local rc=0
 	local expected_rc=0
-
-	if [ $execute_tests -eq 1 ]; then
-		script_num=$TEST_INDEX
-		if [ $script_num -eq 0 ]; then
-			return 0
-		fi
-	fi
 
 	while true; do
 		script=$(eval echo "\$${SCRIPT_PREFIX}_${script_num}")
@@ -350,12 +351,6 @@ scenario_script_exec()
 			done
 		fi
 		script_num=$(($script_num + 1))
-
-		if [ $execute_tests -eq 0 ]; then
-			if [ $script_num -eq $TEST_INDEX ]; then
-				break
-			fi
-		fi
 	done
 
 	return 0
@@ -439,14 +434,49 @@ scenario_exec()
 
 scenario_exec_tests()
 {
+	local iter=$1
+	local tests
+	local num_tests
+	local ran_test_index
+	local cur_test
+	local node
+	local rc
+
+	if [ -z $iter ]; then
+		iter=10
+	fi
+
 	phd_log LOG_NOTICE "=================================" 
 	phd_log LOG_NOTICE "==== Executing Test Scripts  ====" 
 	phd_log LOG_NOTICE "=================================" 
+	phd_log LOG_NOTICE "Performing $iter random test iterations" 
 
-	if [ $TEST_INDEX -eq 0 ]; then
-		phd_log LOG_NOTICE "No tests exist for this scenario"
-	else
-		scenario_script_exec 1
-		phd_log LOG_NOTICE "Success: All tests Passed"
-	fi
+	for cur_test in $(ls ${PHD_TMP_DIR}/tests/*); do
+		if [ -z "$tests" ]; then
+			tests="$cur_test"
+		else 
+			tests="$tests $cur_test"
+		fi
+	done
+	num_tests=$(echo "$tests" | wc -w)
+
+	phd_log LOG_NOTICE "Tests found $num_tests" 
+
+	for (( i=1; i <= $iter; i++ ))
+	do
+		node=$(phd_random_node)
+		ran_test_index=$(( ($RANDOM % $num_tests) + 1 ))
+		cur_test=$(echo "$tests" | cut -d ' ' -f $ran_test_index)
+		phd_log LOG_NOTICE "Iteration ${i}: $cur_test on node ${node}"
+		phd_script_exec $cur_test "$node"
+		rc=$?
+		if [ $rc -eq 0 ]; then
+			phd_log LOG_NOTICE "Success!"
+		else 
+			phd_log LOG_NOTICE "Failed... test $cur_test on node $node exited with code $rc"
+			
+			phd_exit_failure "Tests failed"
+		fi
+	done
+	phd_log LOG_NOTICE "All tests passed"
 }
