@@ -83,23 +83,3 @@ pcs cluster cib-push lvm-gfs2.cib
 phd_rsc_verify_start_all 60
 ....
 
-######################
-#    Test Scripts    #
-######################
-= TESTS =
-
-target=$PHD_ENV_nodes1
-....
-# Verify all resources have started.
-phd_rsc_verify_start_all 60
-phd_test_assert $? 0 "Failed to start all resources"
-
-# Verify all resources can stop and start
-phd_rsc_stop_all
-phd_test_assert $? 0 "Failed to disable resources"
-phd_rsc_verify_stop_all 60
-phd_test_assert $? 0 "Failed to verify all resources stopped"
-phd_rsc_start_all
-phd_test_assert $? 0 "Failed to enable all resources"
-phd_rsc_verify_start_all 60
-phd_test_assert $? 0 "Failed to restart all resources"

@@ -82,34 +82,3 @@ pcs resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  opti
 pcs resource group add nfs-group nfs-daemon nfs-export
 ....
 
-######################
-#    Test Scripts    #
-######################
-= TESTS =
-
-target=$PHD_ENV_nodes1
-....
-# Verify all resources have started.
-phd_rsc_verify_start_all 60
-phd_test_assert $? 0 "Failed to start all resources"
-
-# Verify all resources can stop and start
-phd_rsc_stop_all
-phd_test_assert $? 0 "Failed to disable resources"
-phd_rsc_verify_stop_all 60
-phd_test_assert $? 0 "Failed to verify all resources stopped"
-phd_rsc_start_all
-phd_test_assert $? 0 "Failed to enable all resources"
-phd_rsc_verify_start_all 60
-phd_test_assert $? 0 "Failed to restart all resources"
-
-# Verify nfs-group can relocate
-phd_rsc_relocate nfs-group 60
-phd_test_assert $? 0 "Failed to relocate nfs-group"
-
-# Verify nfs-daemon can recover after failure
-phd_rsc_verify_start_all 60
-phd_test_assert $? 0 "Failed to verify all resources are started before performing recovery test."
-phd_rsc_failure_recovery nfs-daemon 60
-phd_test_assert $? 0 "Failed to recover nfs-daemon after failure"
-....
