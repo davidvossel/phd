@@ -312,3 +312,12 @@ phd_verify_connection()
 	done
 }
 
+phd_random_node()
+{
+	local nodes=$(definition_transport)
+	local num_nodes=$(echo "$nodes" | wc -w)
+	local ran_node_index=$(( ($RANDOM % $num_nodes) + 1 ))
+
+	echo "$nodes" | cut -d ' ' -f $ran_node_index
+}
+

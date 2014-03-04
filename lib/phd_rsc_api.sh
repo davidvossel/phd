@@ -478,3 +478,36 @@ phd_rsc_failure_recovery()
 	return 0
 }
 
+phd_rsc_random()
+{
+	local node="$1"
+	local rsc_list=$(phd_rsc_list 0 "$node")
+	local num_rscs=$(echo "$rsc_list" | wc -w)
+	local ran_rsc_index=$(( ($RANDOM % $num_rscs) + 1 ))
+
+	echo "$rsc_list" | cut -d ' ' -f $ran_rsc_index
+}
+
+phd_rsc_random_moveable()
+{
+	local node="$1"
+	local raw_primitive_filter="sed \"s/.*primitive\\[@id='//g\" | sed \"s/'\\]//g\""
+	local raw_group_filter="sed \"s/.*primitive\\[@id='//g\" | sed \"s/'\\]//g\""
+	local cmd_group="cibadmin  -Q --local --xpath \"/cib/configuration/resources/group/primitive\" --node-path"
+	local cmd_primitive="cibadmin -Q --local --xpath \"/cib/configuration/resources/primitive[@class!='stonith']\" --node-path"
+	local rsc_list
+
+	rsc_list=$(phd_cmd_exec "$cmd_group")
+	rsc_list="$rsc_list $(phd_cmd_exec "$cmd_primitive")"
+
+	local num_rscs=$(echo "$rsc_list" | wc -w)
+
+	if [ $num_rscs -eq 0 ]; then
+		return
+	fi
+
+	local ran_rsc_index=$(( ($RANDOM % $num_rscs) + 1 ))
+
+	echo "$rsc_list" | cut -d ' ' -f $ran_rsc_index
+}
+
