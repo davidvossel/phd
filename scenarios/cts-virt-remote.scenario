@@ -1,0 +1,79 @@
+# CTS in virtualized environtment focusing only on pacemaker_remote tests
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=3
+floating_ips=1
+install_local=1
+packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs resource-agents fence-virt fence-agents libvirt libvirt-daemon-lxc
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Verify the node driving this scenario is outside of the cluster
+##
+target=local
+....
+nodename=$(crm_node -n)
+for node in $(echo $PHD_ENV_nodes); do
+	if [ "$HOSTNAME" = "node" ]; then
+		echo "Must run the virt cts scenario on a node outside of the cluster"
+		exit 1
+	fi
+done
+
+exit 0
+....
+
+
+##
+# Make sure pacemaker is not enabled on bootup
+##
+target=all
+....
+systemctl disable pacemaker
+systemctl disable corosync
+chkconfig pacemaker off
+chkconfig corosync off
+exit 0
+....
+
+##
+# determine if fence_xvm is setup on all nodes
+##
+target=all
+....
+echo "Checking to make sure fence_xvm has a valid key on cluster nodes"
+ls /etc/cluster/fence_xvm.key
+....
+
+##
+# determine if fence_virtd is reachable from all nodes
+##
+target=all
+....
+echo "Checking to make sure fence_xvm is reachable"
+fence_xvm -o list
+....
+
+##
+# Launch CTS
+##
+target=local
+....
+stack="mcp"
+yum list installed | grep cman
+if [ $? -eq 0 ]; then
+	stack="cman"
+fi
+
+rm -f /var/log/cts.log
+
+/usr/share/pacemaker/tests/cts/CTSlab.py --outputfile /var/log/cts.log --nodes "$PHD_ENV_nodes" -r --stonith "rhcs" -c --test-ip-base "$PHD_ENV_floating_ips1" --stack "$stack" --at-boot 0 --container-tests --choose RemoteBaremetal --choose RemoteLXC 100
+....

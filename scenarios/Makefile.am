@@ -6,6 +6,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	cluster-destroy.scenario	\
 	cluster-init.scenario	\
 	cts-virt.scenario	\
+	cts-virt-remote.scenario	\
 	example.scenario	\
 	gfs2-clvmd.scenario	\
 	nfs-basic.scenario	\
