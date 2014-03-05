@@ -25,6 +25,38 @@
 
 #. ${PHDCONST_ROOT}/lib/phd_utils_api.sh
 
+phd_rsc_failed_list()
+{
+	local execnode=$1
+	local output
+	local cmd="cibadmin -Q | grep name=\\\"fail-count- | sed s/.*name=\\\"fail-count-//g | sed s/\\\".*value=.*//g | uniq"
+
+	phd_cmd_exec "$cmd" "$execnode"
+}
+
+phd_rsc_detect_failures()
+{
+	local execnode=$1
+	local fail_list=$(phd_rsc_failed_list "$execnode")
+
+	if [ -n "$fail_list" ]; then
+		return 1
+	fi
+
+	return 0
+}
+
+phd_rsc_clear_failcounts()
+{
+	local execnode=$1
+	local rsc_list=$(phd_rsc_failed_list "$execnode")
+	local rsc
+
+	for rsc in $(echo $rsc_list); do
+		phd_cmd_exec "crm_resource -C -r  $rsc"
+	done
+}
+
 phd_rsc_enable()
 {
 	local rsc=$1
@@ -56,7 +88,8 @@ phd_rsc_disable()
 }
 
 ##
-# Returns only top level resources (Excludes stonith resources)
+# Returns either top level resources (Excludes stonith resources) with 'parent_only'
+# set, or all primitive resources with 'parent_only' not enabled.
 # For example, a group with 3 primitives, only the group id will be returned.
 #
 # Usage: phd_rsc_list <parent resources only> [execution node]
@@ -234,8 +267,19 @@ phd_rsc_verify_start_all()
 	local rsc
 	local rc=1
 
-	stop_time=$(date +%s)
+	phd_wait_cluster_idle $timeout $node
+	if [ $? -ne 0 ]; then
+		phd_log LOG_ERR "Timed out waiting for cluster to become idle"
+		return 1
+	fi
 
+	phd_rsc_detect_failures $node
+	if [ $? -ne 0 ]; then
+		phd_log LOG_ERR "Resource failures detected."
+		return 1
+	fi
+
+	stop_time=$(date +%s)
 	while [ $rc -ne 0 ]; do
 		for rsc in $(echo $rsc_list); do
 			phd_rsc_verify_is_active $rsc 2 $node
@@ -278,6 +322,18 @@ phd_rsc_verify_stop_all()
 	local lapse_sec=0
 	local stop_time=0
 	local cmd="crm_mon -X | grep 'active=\"true\"' | grep -v 'resource_agent=\"stonith' -q"
+
+	phd_wait_cluster_idle $timeout "$node"
+	if [ $? -ne 0 ]; then
+		phd_log LOG_ERR "Timed out waiting for cluster to become idle during stop all"
+		return 1
+	fi
+
+	phd_rsc_detect_failures "$node"
+	if [ $? -ne 0 ]; then
+		phd_log LOG_ERR "Resource failures detected during stop"
+		return 1
+	fi
 
 	stop_time=$(date +%s)
 	phd_cmd_exec "$cmd" "$node"

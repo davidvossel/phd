@@ -325,3 +325,45 @@ phd_random_node()
 	echo "$nodes" | cut -d ' ' -f $ran_node_index
 }
 
+phd_cluster_idle()
+{
+	local execnode=$1
+	local nodes=$(definition_nodes)
+	local node
+
+	for node in $(echo $nodes); do
+		phd_cmd_exec "crmadmin -S $node -t 10000 | grep S_IDLE -q" "$execnode"
+		if [ $? -eq 0 ]; then
+			return 0
+		fi 
+	done
+
+	return 1
+}
+
+phd_wait_cluster_idle()
+{
+	local timeout=$1
+	local execnode=$2
+	local wait_time=$(date +%s)
+	local rc=1
+	local lapse_sec=0
+
+	while [ $rc -ne 0 ]; do
+		lapse_sec=`expr $(date +%s) - $wait_time`
+		if [ $lapse_sec -ge $timeout ]; then
+			phd_log LOG_ERROR "Timed out waiting for cluster to become idle"
+			return 1
+		fi
+
+		phd_cluster_idle "$execnode"
+		rc=$?
+		if [ $rc -ne 0 ]; then
+			sleep 1
+		fi
+	done
+
+	return $rc
+}
+
+

@@ -62,6 +62,7 @@ scenario_script_add_env()
 		file=$(basename $file)
 		echo ". ${PHD_TMP_DIR}/lib/${file}" >> $script
 	done
+	echo ". ${PHD_TMP_DIR}/lib/definition.sh" >> $script
 
 	while read tmp; do
 		local key=$(echo $tmp | awk -F= '{print $1}')
