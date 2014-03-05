@@ -49,7 +49,7 @@ lvmconf --disable-cluster
 ##
 target=$PHD_ENV_nodes1
 ....
-pvcreate $PHD_ENV_shared_storage1
+pvcreate -f $PHD_ENV_shared_storage1
 vgcreate cluster_vg $PHD_ENV_shared_storage1
 lvcreate -L64M -n cluster_lv cluster_vg
 mkfs.ext4 /dev/cluster_vg/cluster_lv
