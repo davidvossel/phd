@@ -39,7 +39,7 @@ phd_qarsh_cmd_exec()
 	local cmd=$1
 	local node=$2
 
-	qarsh -l root -t 120 $node $cmd
+	qarsh -l root -t 300 $node $cmd
 }
 
 #phd_ssh_connection_verify()
