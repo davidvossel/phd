@@ -56,7 +56,7 @@ dev=$PHD_ENV_shared_storage1
 
 pvcreate -f $dev
 vgcreate -cy cluster_vg $dev
-lvcreate -L128M -n cluster_lv cluster_vg
+echo "y" | lvcreate -L128M -n cluster_lv cluster_vg
 mkfs.ext4 /dev/cluster_vg/cluster_lv
 if [ $? -ne 0 ]; then
 	echo "Failed to setup volume group"
