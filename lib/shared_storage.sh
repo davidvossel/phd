@@ -71,9 +71,10 @@ lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	service corosync start
 	/usr/lib/ocf/resource.d/pacemaker/controld start
+else
+	exit 0
 fi
 END
-
 
 	cat <<- END > $corosync_stop
 #!/bin/sh
@@ -86,6 +87,7 @@ if [ \$? -eq 0 ]; then
 	service corosync stop
 	sleep 1
 fi
+exit 0
 END
 
 	cat <<- END > $clvmd_start
@@ -97,6 +99,8 @@ lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	echo "starting clvmd"
 	/usr/lib/ocf/resource.d/heartbeat/clvm start
+else 
+	exit 0
 fi
 END
 	cat <<- END > $clvmd_stop
@@ -108,6 +112,8 @@ lvm dumpconfig global/locking_type 2>&1 | grep 'locking_type=3' > /dev/null 2>&1
 if [ \$? -eq 0 ]; then
 	echo "stopping clvmd"
 	/usr/lib/ocf/resource.d/heartbeat/clvm stop
+else 
+	exit 0
 fi
 END
 
@@ -129,6 +135,7 @@ for dev in \$(echo \$devices); do
 	fuser -mkv \$dev
 	umount \$dev
 done
+exit 0
 END
 
 	cat <<- END > $wipe_script
@@ -171,7 +178,6 @@ for dev in \$(echo \$devices); do
 done
 
 exit 0
-
 END
 
 	# set consistent lvm locking type across cluster
