@@ -279,6 +279,10 @@ scenario_distribute_api()
 	local nodes=$(definition_nodes)
 	local file
 
+	phd_log LOG_NOTICE "============================" 
+	phd_log LOG_NOTICE "==== Distribute PHD API ====" 
+	phd_log LOG_NOTICE "============================" 
+
 	for file in $(echo $api_files); do
 		file=$(basename $file)
 		# copy it remotely
@@ -411,9 +415,6 @@ scenario_exec()
 	phd_log LOG_NOTICE "=========================" 
 	scenario_package_install
 
-	phd_log LOG_NOTICE "============================" 
-	phd_log LOG_NOTICE "==== Distribute PHD API ====" 
-	phd_log LOG_NOTICE "============================" 
 	scenario_distribute_api
 
 	phd_log LOG_NOTICE "===================================="
