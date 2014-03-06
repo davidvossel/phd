@@ -291,7 +291,7 @@ phd_rsc_verify_start_all()
 		done
 
 		if [ $rc -eq 0 ]; then
-			phd_log LOG_INFO "Success, all resources are active"
+			phd_log LOG_INFO "All resources are active"
 			return 0
 		fi
 
@@ -348,6 +348,7 @@ phd_rsc_verify_stop_all()
 		phd_log LOG_DEBUG "still waiting to verify stop all"
 		phd_cmd_exec "$cmd" "$node"
 	done
+	phd_log LOG_INFO "All resources have stopped."
 	return 0
 }
 
@@ -441,7 +442,7 @@ phd_rsc_relocate()
 		phd_cmd_exec "pcs resource defaults resource-stickiness=100" "$node"
 	fi
 
-	phd_log LOG_DEBUG "Moving $rsc away from node $cur_node"
+	phd_log LOG_INFO "Moving $rsc away from node $cur_node"
 	phd_cmd_exec "pcs resource move $rsc" "$node"
 	phd_rsc_verify_is_stopped_on "$rsc" "$cur_node" $timeout "$node"
 	if [ $? -ne 0 ]; then
@@ -505,6 +506,8 @@ phd_rsc_failure_recovery()
 		return 1
 	fi
 
+	phd_log LOG_INFO "Performing failure recovery. resource:$rsc node:$node"
+
 	# clear failcount
 	phd_cmd_exec "crm_resource -C -r  $rsc -N $cur_node"
 
@@ -531,6 +534,7 @@ phd_rsc_failure_recovery()
 		return 1
 	fi
 
+	phd_log LOG_INFO "Failure recovery complete for resource, ${rsc}. Clearing failcounts."
 	# clear failcount
 	phd_cmd_exec "crm_resource -C -r  $rsc -N $cur_node"
 	return 0
@@ -546,7 +550,7 @@ phd_rsc_random()
 	echo "$rsc_list" | cut -d ' ' -f $ran_rsc_index
 }
 
-phd_rsc_random_moveable()
+phd_rsc_random_movable()
 {
 	local node="$1"
 	local cmd_group="cibadmin  -Q --local --xpath \"/cib/configuration/resources/group/primitive\" --node-path"

@@ -2,10 +2,11 @@ phd_rsc_verify_start_all 60
 phd_test_assert $? 0 "Failed to start all resources before relocate test"
 
 # Verify a random group or primitive can relocate
-rsc=$(phd_rsc_random_moveable)
+rsc=$(phd_rsc_random_movable)
 
 if [ -z "$rsc" ]; then
 	#skip
+	phd_log LOG_NOTICE "No movable resource found in scenario, skipping test"
 	exit 0
 fi
 
