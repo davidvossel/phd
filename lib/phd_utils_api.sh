@@ -91,6 +91,24 @@ phd_time_stamp()
 	date +%b-%d-%T
 }
 
+phd_log_priority_index()
+{
+	local level=1
+
+	case $priority in
+	LOG_ERROR|LOG_ERR|LOG_WARNING) level=0;;
+	LOG_NOTICE) level=1;;
+	LOG_INFO) level=2;;
+	LOG_DEBUG) level=3;;
+	LOG_TRACE) level=4;;
+	# exec output can only be logged to files
+	LOG_EXEC) level=5;;
+	*) phd_log LOG_WARNING "!!!WARNING!!! Unknown log level ($priority)"
+	esac
+
+	return $level
+}
+
 phd_log()
 {
 	local priority=$1
@@ -113,15 +131,13 @@ phd_log()
 	fi
 
 	case $priority in
-	LOG_ERROR|LOG_ERR|LOG_WARNING) level=0;;
-	LOG_NOTICE) level=1;;
-	LOG_INFO) level=2;;
-	LOG_DEBUG) level=3;;
-	LOG_TRACE) level=4;;
 	# exec output can only be logged to files
-	LOG_EXEC) level=5; enable_log_stdout=0;;
-	*) phd_log LOG_WARNING "!!!WARNING!!! Unknown log level ($priority)"
+	LOG_EXEC) enable_log_stdout=0;;
+	*) : ;;
 	esac
+
+	phd_log_priority_index "$priority"
+	level=$?
 
 	log_msg="$priority: $node: $(basename ${BASH_SOURCE[1]})[$$]:${BASH_LINENO} - $msg"
 	if [ $level -le $PHD_LOG_LEVEL ]; then
@@ -142,16 +158,29 @@ phd_log_script_output()
 	local script="$2"
 	local rc=$3
 	local node=$4
-	local enable_log_stdout=$PHD_LOG_STDOUT
+	local enable_log_stdout=0
+	local priority="LOG_DEBUG"
+	local level=0
+
+	if [ $rc -ne 0 ]; then
+		priority="LOG_INFO"
+	fi
+
+	phd_log_priority_index "$priority"
+	level=$?
 
 	if [ -z "$output" ]; then
 		return
 	fi
 
+	if [ $level -le $PHD_LOG_LEVEL ] && [ $PHD_LOG_STDOUT -ne 0 ]; then
+		enable_log_stdout=1
+	fi
+
 	if [ $enable_log_stdout -ne 0 ]; then
 		echo -e "\n"
 	fi
-	phd_log LOG_INFO "BEGIN SCRIPT LOG, $script, ON NODE, $node"
+	phd_log $priority "BEGIN SCRIPT LOG, $script, ON NODE, $node"
 	while read line
 	do
 		if [ $enable_log_stdout -ne 0 ]; then
@@ -161,8 +190,8 @@ phd_log_script_output()
 			echo "$line" >> $PHD_LOG_FILE
 		fi
 	done < <(echo "$output" | sed 's/ LOG_/\nLOG_/g')
-	phd_log LOG_INFO "EXIT CODE $rc"
-	phd_log LOG_INFO "END EXTERNAL SCRIPT LOG ON NODE $node\n"
+	phd_log $priority "EXIT CODE $rc"
+	phd_log $priority "END EXTERNAL SCRIPT LOG ON NODE $node\n"
 
 }
 
@@ -295,6 +324,7 @@ phd_exit_failure()
 	fi
 
 	phd_log LOG_ERR "Exiting: $reason"
+	phd_log LOG_ERR "See $PHD_LOG_FILE for debug information"
 	exit 1
 }
 

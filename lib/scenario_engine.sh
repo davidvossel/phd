@@ -469,7 +469,7 @@ scenario_exec_tests()
 		node=$(phd_random_node)
 		ran_test_index=$(( ($RANDOM % $num_tests) + 1 ))
 		cur_test=$(echo "$tests" | cut -d ' ' -f $ran_test_index)
-		phd_log LOG_NOTICE "Iteration ${i}: $cur_test on node ${node}"
+		phd_log LOG_NOTICE "Iteration ${i}: $(basename $cur_test) on node ${node}"
 		phd_script_exec $cur_test "$node"
 		rc=$?
 		if [ $rc -eq 0 ]; then
