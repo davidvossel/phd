@@ -126,7 +126,7 @@ phd_log()
 	log_msg="$priority: $node: $(basename ${BASH_SOURCE[1]})[$$]:${BASH_LINENO} - $msg"
 	if [ $level -le $PHD_LOG_LEVEL ]; then
 		if [ $enable_log_stdout -ne 0 ]; then
-			echo "$log_msg"
+			echo -e "$log_msg"
 		fi
 	fi
 
@@ -134,6 +134,36 @@ phd_log()
 	if [ -n "$PHD_LOG_FILE" ]; then
 		echo "$(phd_time_stamp): $log_msg" >> $PHD_LOG_FILE
 	fi
+}
+
+phd_log_script_output()
+{
+	local output="$1"
+	local script="$2"
+	local rc=$3
+	local node=$4
+	local enable_log_stdout=$PHD_LOG_STDOUT
+
+	if [ -z "$output" ]; then
+		return
+	fi
+
+	if [ $enable_log_stdout -ne 0 ]; then
+		echo -e "\n"
+	fi
+	phd_log LOG_INFO "BEGIN SCRIPT LOG, $script, ON NODE, $node"
+	while read line
+	do
+		if [ $enable_log_stdout -ne 0 ]; then
+			echo -e "$line"
+		fi
+		if [ -n "$PHD_LOG_FILE" ]; then
+			echo "$line" >> $PHD_LOG_FILE
+		fi
+	done < <(echo "$output" | sed 's/ LOG_/\nLOG_/g')
+	phd_log LOG_INFO "EXIT CODE $rc"
+	phd_log LOG_INFO "END EXTERNAL SCRIPT LOG ON NODE $node\n"
+
 }
 
 phd_set_exec_dir()
@@ -242,15 +272,16 @@ phd_script_exec()
 	local dir=$(dirname $script)
 	local nodes=$2
 	local node
+	local output
 	local rc
 
 	for node in $(echo $nodes); do
-		phd_log LOG_DEBUG "executing script \"$script\" on node \"$node\""		
+		phd_log LOG_INFO "executing script \"$script\" on node \"$node\""		
 		phd_cmd_exec "mkdir -p $dir" "$node" > /dev/null 2>&1
 		phd_node_cp "$script" "$script" "$node" "755" > /dev/null 2>&1
 		output=$(phd_cmd_exec "$script" "$node")
 		rc=$?
-		echo "$output" | sed 's/ LOG_/\nLOG_/g'
+		phd_log_script_output "$output" $(basename $script) $rc $node
 	done
 	return $rc
 }
