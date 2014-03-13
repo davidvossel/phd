@@ -1,0 +1,144 @@
+# samba using GFS2 filesystem on shared storage
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+shared_storage=1
+fence_cmd=1
+floating_ips=1
+
+packages=pacemaker corosync pcs dlm gfs2-utils resource-agents samba ctdb
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Make sure all samba services are disabled
+# setup samba configs
+##
+target=all
+....
+nodes=$PHD_ENV_nodes
+
+systemctl disable ctdb
+systemctl disable smb
+systemctl disable nmb
+systemctl disable winbind
+systemctl stop ctdb
+systemctl stop smb
+systemctl stop nmb
+systemctl stop winbind
+
+cat << END > /etc/samba/smb.conf
+[global]
+netbios name = linuxserver
+workgroup = WORKGROUP
+server string = Public File Server
+security = user
+map to guest = bad user
+guest account = smbguest
+clustering = yes
+[public]
+path = /mnt/gfs2share/public
+guest ok = yes
+read only = no
+END
+
+#TODO these are going to have to be real ip address
+# not just node names
+rm -f /etc/ctdb/nodes
+for node in $(echo $nodes); do
+    echo "$node" >> /etc/ctdb/nodes
+done
+
+groupadd -g 581 smbguest
+adduser smbguest -g smbguest
+
+exit 0
+....
+
+##
+# setup clvmd and dlm for clustered lvm management
+##
+target=$PHD_ENV_nodes1
+....
+tmpfile=mktemp
+pcs resource defaults resource-stickiness=100
+pcs resource create dlm controld op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+
+phd_rsc_verify_start_all 90
+....
+
+##
+# Make the gfs2 fs
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+mkfs.gfs2 -O -j4 -J 64 -p lock_dlm -t ${PHD_ENV_cluster_name}:gfs2-demo $dev
+if [ $? -ne 0 ]; then
+	echo "Failed to setup gfs2 filesystem"
+	exit 1
+fi
+....
+
+##
+# Make the filesystem resource
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+pcs resource create gfs2 Filesystem device="${dev}" directory="/mnt/gfs2share" fstype="gfs2" op monitor interval=10s on-fail=fence clone interleave=true
+pcs constraint order start dlm-clone then gfs2-clone
+pcs constraint colocation add gfs2-clone with dlm-clone
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
+##
+# setup the filesystem for the samba share
+##
+target=$PHD_ENV_nodes1
+....
+mkdir -p /mnt/gfs2share/ctdb
+mkdir -p /mnt/gfs2share/public
+chown smbguest:smbguest /mnt/gfs2share/public
+chmod 755 /mnt/gfs2share/public
+....
+
+##
+# Make the samba resources
+##
+target=$PHD_ENV_nodes1
+....
+tmpfile=mktemp
+
+pcs cluster cib $tmpfile
+
+pcs -f $tmpfile resource create samba-ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=32 clone
+pcs -f $tmpfile resource create ctdb CTDB ctdb_recovery_lock="/mnt/gfs2share/ctdb/ctdb.lock" ctdb_dbdir=/var/ctdb ctdb_socket=/tmp/ctdb.socket ctdb_logfile=/var/log/ctdb.log op monitor interval=10 timeout=30 op start timeout=90 op stop timeout=100 clone
+pcs -f $tmpfile resource create samba systemd:smb clone
+
+#TODO maybe we should make this a group
+pcs -f $tmpfile constraint order gfs2-clone then ctdb-clone
+pcs -f $tmpfile constraint order samba-ip-clone then ctdb-clone
+pcs -f $tmpfile constraint order ctdb-clone then samba-clone
+pcs -f $tmpfile constraint colocation add ctdb-clone with gfs2-clone
+pcs -f $tmpfile constraint colocation add ctdb-clone with samba-ip-clone
+pcs -f $tmpfile constraint colocation add samba-clone with ctdb-clone
+
+pcs cluster cib-push $tmpfile
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
