@@ -58,6 +58,9 @@ package_install_custom()
 	fi
 
 	for node in $(echo $nodes); do
+
+		phd_cmd_exec "cp /etc/sysconfig/pacemaker /etc/sysconfig/pacemaker.bu" "$node"
+
 		phd_log LOG_DEBUG "Installing custom packages '$packages' on node '$node'"
 		phd_cmd_exec "yum remove -y $packages >/dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
@@ -67,6 +70,7 @@ package_install_custom()
 		if [ $? -ne 0 ]; then
 			phd_exit_failure "Could not install custom packages on \"$node\""
 		fi
+		phd_cmd_exec "cp /etc/sysconfig/pacemaker.bu /etc/sysconfig/pacemaker" "$node"
 	done
 
 	# Keep up with a list of the custom packages installed
