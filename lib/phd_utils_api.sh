@@ -54,7 +54,7 @@ phd_detect_transport()
 		*) phd_exit_failure "Unknown Transport \"$PHD_TRANSPORT\". Valid values are ssh and qarsh" ;;
 		esac
 
-		phd_log LOG_NOTICE "Using $PHD_TRANSPORT as transport"
+		phd_log LOG_EXEC "Using $PHD_TRANSPORT as transport"
 	fi
 }
 

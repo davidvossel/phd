@@ -50,11 +50,11 @@ guest ok = yes
 read only = no
 END
 
-#TODO these are going to have to be real ip address
-# not just node names
 rm -f /etc/ctdb/nodes
 for node in $(echo $nodes); do
-    echo "$node" >> /etc/ctdb/nodes
+	ip=$(phd_cmd_exec "ip addr | grep 'inet ' | tail -n 1" "$node")
+	ip=$(echo "$ip" | awk '{print $2}' | sed 's/\/.*//g' | sed 's/inet //g')
+	echo "$ip" >> /etc/ctdb/nodes
 done
 
 groupadd -g 581 smbguest
