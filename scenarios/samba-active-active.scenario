@@ -125,7 +125,7 @@ tmpfile=mktemp
 pcs cluster cib $tmpfile
 
 pcs -f $tmpfile resource create samba-ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=32 clone
-pcs -f $tmpfile resource create ctdb CTDB ctdb_recovery_lock="/mnt/gfs2share/ctdb/ctdb.lock" ctdb_dbdir=/var/ctdb ctdb_socket=/tmp/ctdb.socket ctdb_logfile=/var/log/ctdb.log op monitor interval=10 timeout=30 op start timeout=90 op stop timeout=100 clone
+pcs -f $tmpfile resource create ctdb CTDB ctdb_recovery_lock="/mnt/gfs2share/ctdb/ctdb.lock" ctdb_dbdir=/var/ctdb ctdb_socket=/var/run/ctdb/ctdbd.socket ctdb_logfile=/var/log/ctdb.log op monitor interval=10 timeout=30 op start timeout=90 op stop timeout=100 clone
 pcs -f $tmpfile resource create samba systemd:smb clone
 
 #TODO maybe we should make this a group
