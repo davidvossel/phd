@@ -9,6 +9,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	cts-virt-remote.scenario	\
 	example.scenario	\
 	gfs2-clvmd.scenario	\
+	iscsi-clvmd-dlm.scenario	\
 	mariadb-basic.scenario	\
 	nfs-basic.scenario	\
 	nfs-shared-clvmd.scenario	\

@@ -1,0 +1,96 @@
+# Creates scsi+clvmd+dlm scenario along with a clustered logical volume
+# cluster_vg/cluster_lv
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs dlm lvm2 lvm2-cluster gfs2-utils resource-agents targetcli iscsi-initiator-utils fence-agents-scsi
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize lvm
+##
+target=all
+....
+lvmconf --enable-cluster
+....
+
+##
+# setup the iscsi dev from a tmp file for testing
+##
+target=$PHD_ENV_nodes1
+....
+iqn=$(targetcli ls /iscsi  | grep iqn | awk '{ print $2 }')
+if [ -n "$iqn" ]; then
+	echo "iscsi dev already setup. $iqn"
+	exit 0
+fi
+
+storage_file=$(mktemp /tmp/iscsi-dev-XXXXX)
+fallocate -l1g  $storage_file
+targetcli backstores/fileio/ create name=f_backend file_or_dev=${storage_file}
+targetcli /iscsi create
+iqn=$(targetcli ls /iscsi  | grep iqn | awk '{ print $2 }')
+targetcli /iscsi/${iqn}/tpg1/luns create /backstores/fileio/f_backend
+if [ $? -ne 0 ]; then
+	echo "Failed to create iscsi from fileio dev $storage_file"
+	return 1
+fi
+
+targetcli /iscsi/${iqn}/tpg1/portals create
+wwn=$(cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
+targetcli /iscsi/${iqn}/tpg1/acls create $wwn
+targetcli /iscsi/${iqn}/tpg1 set attribute generate_node_acls=1
+targetcli saveconfig
+....
+
+##
+# discovery and login to iscsi everywhere
+##
+target=all
+....
+iqn=$(iscsiadm -m discovery -t sendtargets -p ${PHD_ENV_nodes1}:3260 | awk '{print $2}')
+iscsiadm -m node --target $iqn --portal ${PHD_ENV_nodes1}:3260 --login
+if [ $? -ne 0 ]; then
+	echo "Failed to login to $iqn"
+	exit 1
+fi
+....
+
+##
+# set the fencing devices
+##
+target=$PHD_ENV_nodes1
+....
+# TODO, generally the device has been called sda, but we
+# need to detect this rather than assume
+pcs stonith create scsi-shooter fence_scsi devices=/dev/sda
+....
+
+##
+# setup clvmd and dlm for clustered lvm management
+##
+target=$PHD_ENV_nodes1
+....
+tmpfile=$(mktemp tmpcib-XXXX)
+pcs resource defaults resource-stickiness=100
+
+pcs cluster cib $tmpfile
+pcs -f $tmpfile resource create dlm controld meta requires=unfencing op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+pcs -f $tmpfile resource create clvmd clvm op monitor interval=30s on-fail=fence clone interleave=true ordered=true
+pcs -f $tmpfile constraint order start dlm-clone then clvmd-clone
+pcs -f $tmpfile constraint colocation add clvmd-clone with dlm-clone
+pcs cluster cib-push $tmpfile
+
+phd_wait_pidof "clvmd" 90
+phd_rsc_verify_start_all 120
+....
+
+
