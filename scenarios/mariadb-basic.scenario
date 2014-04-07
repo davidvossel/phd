@@ -1,0 +1,44 @@
+# HA mariadb server on shared storage.
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+shared_storage=1
+floating_ips=1
+packages=pacemaker corosync pcs mariadb-server mariadb mariadb-libs
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Make the cluster storage volume group
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+mkfs.ext4 $dev
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+....
+
+##
+# Make the filesystem resources and floating ip
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+pcs resource create sql_share Filesystem device=${dev} directory=/var/lib/mysql fstype=ext4 --group sql-group
+pcs resource create sql_ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24 --group sql-group
+pcs resource create sql_server mysql enable_creation=true --group sql-group
+....
+
