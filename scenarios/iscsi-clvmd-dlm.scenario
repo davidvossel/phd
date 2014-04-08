@@ -71,7 +71,8 @@ target=$PHD_ENV_nodes1
 ....
 # TODO, generally the device has been called sda, but we
 # need to detect this rather than assume
-pcs stonith create scsi-shooter fence_scsi devices=/dev/sda
+pcs stonith create scsi-shooter fence_scsi devices=/dev/sda meta provides=unfencing
+pcs property set stonith-enabled=true
 ....
 
 ##
