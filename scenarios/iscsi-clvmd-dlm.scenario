@@ -1,5 +1,5 @@
 # Creates scsi+clvmd+dlm scenario along with a clustered logical volume
-# cluster_vg/cluster_lv
+# iscsi_vg/iscsi_lv
 
 #################################
 # Scenario Requirements Section #
@@ -15,7 +15,7 @@ cluster_init=1
 = SCRIPTS =
 
 ##
-# Initialize lvm
+# 1. Initialize lvm
 ##
 target=all
 ....
@@ -23,19 +23,21 @@ lvmconf --enable-cluster
 ....
 
 ##
-# setup the iscsi dev from a tmp file for testing
+# 2. setup the iscsi dev from a tmp file for testing
 ##
 target=$PHD_ENV_nodes1
 ....
+fs_size="1g"
 iqn=$(targetcli ls /iscsi  | grep iqn | awk '{ print $2 }')
 if [ -n "$iqn" ]; then
 	echo "iscsi dev already setup. $iqn"
 	exit 0
 fi
 
+rm -f /tmp/iscsi-dev-*
 storage_file=$(mktemp /tmp/iscsi-dev-XXXXX)
-fallocate -l1g  $storage_file
-targetcli backstores/fileio/ create name=f_backend file_or_dev=${storage_file}
+fallocate -l${fs_size}  $storage_file
+targetcli backstores/fileio/ create name=f_backend file_or_dev=${storage_file} size=${fs_size}
 targetcli /iscsi create
 iqn=$(targetcli ls /iscsi  | grep iqn | awk '{ print $2 }')
 targetcli /iscsi/${iqn}/tpg1/luns create /backstores/fileio/f_backend
@@ -47,12 +49,13 @@ fi
 targetcli /iscsi/${iqn}/tpg1/portals create
 wwn=$(cat /etc/iscsi/initiatorname.iscsi | awk -F= '{print $2}')
 targetcli /iscsi/${iqn}/tpg1/acls create $wwn
-targetcli /iscsi/${iqn}/tpg1 set attribute generate_node_acls=1
+# this gives us an unprotected iscsi target to connect to for testing
+targetcli /iscsi/${iqn}/tpg1 set attribute authentication=0 demo_mode_write_protect=0 generate_node_acls=1 cache_dynamic_acls=1.
 targetcli saveconfig
 ....
 
 ##
-# discovery and login to iscsi everywhere
+# 3. discovery and login to iscsi everywhere
 ##
 target=all
 ....
@@ -65,18 +68,18 @@ fi
 ....
 
 ##
-# set the fencing devices
+# 4. set the fencing devices
 ##
 target=$PHD_ENV_nodes1
 ....
 # TODO, generally the device has been called sda, but we
 # need to detect this rather than assume
-pcs stonith create scsi-shooter fence_scsi devices=/dev/sda meta provides=unfencing
 pcs property set stonith-enabled=true
+pcs stonith create scsi-shooter fence_scsi devices=/dev/sda pcmk_host_list="${PHD_ENV_nodes}" meta provides=unfencing
 ....
 
 ##
-# setup clvmd and dlm for clustered lvm management
+# 5. setup clvmd and dlm for clustered lvm management
 ##
 target=$PHD_ENV_nodes1
 ....
@@ -92,6 +95,47 @@ pcs cluster cib-push $tmpfile
 
 phd_wait_pidof "clvmd" 90
 phd_rsc_verify_start_all 120
+....
+
+##
+# 6. Make the cluster storage volume group
+##
+target=$PHD_ENV_nodes1
+....
+# TODO check to see if vg already exists
+# TODO autocreate the device
+dev="/dev/sda"
+
+pvcreate -f $dev
+vgcreate -cy iscsi_vg $dev
+echo "y" | lvcreate -L 512M -n iscsi_lv iscsi_vg
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+lvdisplay
+
+mkfs.gfs2 -O -j4 -J 64 -p lock_dlm -t ${PHD_ENV_cluster_name}:gfs2-iscsi /dev/iscsi_vg/iscsi_lv
+if [ $? -ne 0 ]; then
+	echo "Failed to setup gfs2 filesystem"
+	exit 1
+fi
+....
+
+
+##
+# 7. mount the gfs2 filesystem 
+##
+target=$PHD_ENV_nodes1
+....
+pcs cluster cib lvm-gfs2.cib
+pcs -f lvm-gfs2.cib resource create gfs2 Filesystem device=/dev/iscsi_vg/iscsi_lv directory=/gfs2share fstype=gfs2 op monitor interval=10s on-fail=fence clone interleave=true
+pcs -f lvm-gfs2.cib constraint order start clvmd-clone then gfs2-clone
+pcs -f lvm-gfs2.cib constraint colocation add gfs2-clone with clvmd-clone
+pcs cluster cib-push lvm-gfs2.cib
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
 ....
 
 
