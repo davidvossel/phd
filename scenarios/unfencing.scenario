@@ -1,0 +1,33 @@
+# Tests resources requiring unfencing
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker pacemaker-cts corosync pcs
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# setup fencing device and resources that require unfencing
+##
+target=all
+....
+cp -f /usr/share/pacemaker/tests/cts/fence_dummy /usr/sbin/fence_dummy
+
+pcs stonith create dummy_shooter fence_dummy pcmk_host_list="${PHD_ENV_nodes}" mode=pass meta provides=unfencing
+
+pcs resource create fakersc1 Dummy meta requires=unfencing
+pcs resource create fakersc2 Dummy meta requires=unfencing
+pcs resource create fakersc3 Dummy meta requires=unfencing
+pcs resource create fakersc4 Dummy meta requires=unfencing
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
