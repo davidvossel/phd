@@ -20,6 +20,7 @@ target=all
 ....
 cp -f /usr/share/pacemaker/tests/cts/fence_dummy /usr/sbin/fence_dummy
 
+pcs property set stonith-enabled=true
 pcs stonith create dummy_shooter fence_dummy pcmk_host_list="${PHD_ENV_nodes}" mode=pass meta provides=unfencing
 
 pcs resource create fakersc1 Dummy meta requires=unfencing
