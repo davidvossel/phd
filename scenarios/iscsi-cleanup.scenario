@@ -1,0 +1,40 @@
+# This scenario exists just to teardown an iscsi setup
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=1
+packages=pacemaker corosync pcs dlm lvm2 lvm2-cluster gfs2-utils resource-agents targetcli iscsi-initiator-utils fence-agents-scsi
+cluster_destroy=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+target=all
+....
+iqn=$(iscsiadm -m discovery -t sendtargets -p ${PHD_ENV_nodes1}:3260 | awk '{print $2}')
+if [ -n "$iqn" ]; then
+	iscsiadm -m node --target $iqn --portal ${PHD_ENV_nodes1}:3260 --logout
+	iscsiadm -m node --target $iqn --portal ${PHD_ENV_nodes1}:3260 -o delete
+fi
+exit 0
+....
+
+##
+# cleanup iscsi target
+##
+target=$PHD_ENV_nodes1
+....
+iqn=$(targetcli ls /iscsi  | grep iqn | awk '{ print $2 }')
+if [ -n "$iqn" ]; then
+	targetcli /iscsi/${iqn}/tpg1/luns delete 1
+	targetcli /iscsi delete $iqn
+fi
+targetcli backstores/fileio/ delete name=f_backend
+rm -rf /tmp/iscsi-dev-*
+
+exit 0
+....
