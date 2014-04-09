@@ -5,6 +5,7 @@ phd_scenariosdir = $(libexecdir)/$(PACKAGE)/scenarios
 phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	cluster-destroy.scenario	\
 	cluster-init.scenario	\
+	clvmd-dlm-init.scenario	\
 	cts-virt.scenario	\
 	cts-virt-remote.scenario	\
 	example.scenario	\
