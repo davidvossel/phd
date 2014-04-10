@@ -15,8 +15,10 @@ cluster_destroy=1
 
 target=all
 ....
-iqn=$(iscsiadm -m discovery -t sendtargets -p ${PHD_ENV_nodes1}:3260 | awk '{print $2}')
+iqn=$(iscsiadm -m discovery -t sendtargets -p ${PHD_ENV_nodes1}:3260 | grep -v session | awk '{print $2}')
+echo "Processing $iqn client to ${PHD_ENV_nodes1}"
 if [ -n "$iqn" ]; then
+        # Nuclear option: iscsiadm -m node --logout
 	iscsiadm -m node --target $iqn --portal ${PHD_ENV_nodes1}:3260 --logout
 	iscsiadm -m node --target $iqn --portal ${PHD_ENV_nodes1}:3260 -o delete
 fi
@@ -28,7 +30,8 @@ exit 0
 ##
 target=$PHD_ENV_nodes1
 ....
-iqn=$(targetcli ls /iscsi  | grep iqn | awk '{ print $2 }')
+iqn=$(targetcli ls /iscsi  | grep iqn.*TPGs | awk '{ print $2 }')
+echo "Processing $iqn target"
 if [ -n "$iqn" ]; then
 	targetcli /iscsi/${iqn}/tpg1/luns delete 1
 	targetcli /iscsi delete $iqn
