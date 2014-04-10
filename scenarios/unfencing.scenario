@@ -13,13 +13,20 @@ cluster_init=1
 ######################
 = SCRIPTS =
 
+
 ##
-# setup fencing device and resources that require unfencing
+# install dummy device
 ##
 target=all
 ....
 cp -f /usr/share/pacemaker/tests/cts/fence_dummy /usr/sbin/fence_dummy
+....
 
+##
+# setup fencing device and resources that require unfencing
+##
+target=$PHD_ENV_nodes1
+....
 pcs property set stonith-enabled=true
 pcs stonith create dummy_shooter fence_dummy pcmk_host_list="${PHD_ENV_nodes}" mode=pass meta provides=unfencing
 
