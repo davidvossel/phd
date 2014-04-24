@@ -77,7 +77,7 @@ touch /nfsshare/clientdata/clientsharefile
 # are initialized on the shared storage mount
 pcs constraint location remove location-nfs-group-${PHD_ENV_nodes1}-INFINITY
 
-pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo nfs_ip=$PHD_ENV_floating_ips1
+pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo nfs_ip=$PHD_ENV_floating_ips1 nfs_notify_foreground=true
 pcs resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync directory=/nfsshare/clientdata fsid=0
 pcs resource group add nfs-group nfs-daemon nfs-export
 ....
