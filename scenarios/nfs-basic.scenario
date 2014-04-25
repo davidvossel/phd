@@ -22,11 +22,12 @@ clean_shared_storage=1
 ##
 target=all
 ....
-lvmconf --enable-cluster
 systemctl disable nfs-server
 systemctl stop nfs-server
 systemctl disable nfs-lock
 systemctl stop nfs-lock
+
+exit 0
 ....
 
 ##
