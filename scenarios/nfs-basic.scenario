@@ -63,6 +63,14 @@ pcs constraint location nfs-group avoids $PHD_ENV_nodes3
 
 # Wait for all resources to start
 phd_rsc_verify_start_all 60
+
+# Now that our mounts are up, setup the client folders
+mkdir /nfsshare/clientdata
+touch /nfsshare/clientdata/clientsharefile
+
+# Remove that temporary location constraint now that the folders
+# are initialized on the shared storage mount
+pcs constraint location remove location-nfs-group-${PHD_ENV_nodes1}-INFINITY
 ....
 
 
@@ -73,15 +81,7 @@ target=$PHD_ENV_nodes1
 ....
 suffix=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
 
-# Now that our mounts are up, setup the client folders
-mkdir /nfsshare/clientdata
-touch /nfsshare/clientdata/clientsharefile
-
-# Remove that temporary location constraint now that the folders
-# are initialized on the shared storage mount
-pcs constraint location remove location-nfs-group-${PHD_ENV_nodes1}-INFINITY
-
-pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo nfs_ip=$PHD_ENV_floating_ips1 --group nfs-group
+pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo --group nfs-group
 pcs resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync directory=/nfsshare/clientdata fsid=0 --group nfs-group
 pcs resource create nfs-ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24 --group nfs-group
 
@@ -98,7 +98,7 @@ target=$PHD_ENV_nodes3
 
 systemctl start nfs-lock
 # mount the share
-pcs resource create nfs-client FileSystem device=192.168.122.200:/nfsshare/clientdata  directory=/nfsclient fstype=nfs
+pcs resource create nfs-client FileSystem device=${PHD_ENV_floating_ips1}:/nfsshare/clientdata  directory=/nfsclient fstype=nfs
 pcs constraint location nfs-client prefers $PHD_ENV_nodes3
 
 phd_rsc_verify_start_all 60
