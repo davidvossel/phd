@@ -4,7 +4,7 @@
 # Scenario Requirements Section #
 #################################
 = REQUIREMENTS =
-nodes=2
+nodes=3
 shared_storage=1
 floating_ips=1
 fence_cmd=1
@@ -35,7 +35,7 @@ systemctl stop nfs-lock
 ##
 target=$PHD_ENV_nodes1
 ....
-tmpfile=mktemp
+tmpfile=$(mktemp tmpXXXX)
 pcs resource defaults resource-stickiness=100
 pcs cluster cib $tmpfile
 pcs -f $tmpfile resource create dlm controld op monitor interval=30s on-fail=fence clone interleave=true ordered=true
@@ -66,30 +66,22 @@ vgchange -an cluster_vg
 ....
 
 ##
-# Make the lvm resources and floating ip
+# Make the lvm resources
 ##
 target=$PHD_ENV_nodes1
 ....
-pcs cluster cib lvm-ext4.cib
-pcs -f lvm-ext4.cib resource create cluster_vg LVM volgrpname=cluster_vg exclusive=true
-pcs -f lvm-ext4.cib resource create nfsshare Filesystem device=/dev/cluster_vg/cluster_lv directory=/nfsshare fstype=ext4
-pcs -f lvm-ext4.cib resource create nfs_ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24
-pcs -f lvm-ext4.cib resource group add nfs-group cluster_vg nfsshare nfs_ip
-pcs -f lvm-ext4.cib constraint order start clvmd-clone then nfs-group
-pcs -f lvm-ext4.cib constraint colocation add nfs-group with clvmd-clone
+
+pcs resource create cluster_vg LVM volgrpname=cluster_vg exclusive=true --group nfs-group
+pcs resource create nfsshare Filesystem device=/dev/cluster_vg/cluster_lv directory=/nfsshare fstype=ext4 --group nfs-group
+pcs constraint order start clvmd-clone then nfs-group
+pcs colocation add nfs-group with clvmd-clone
 # put the nfs group on a node we can predict,
 # this just helps automate NFS share setup, but will be removed later.
-pcs -f lvm-ext4.cib constraint location nfs-group prefers $PHD_ENV_nodes1
-pcs cluster cib-push lvm-ext4.cib
-....
+pcs constraint location nfs-group prefers $PHD_ENV_nodes1
 
-
-##
-# NFS share setup
-##
-target=$PHD_ENV_nodes1
-....
-suffix=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+# For this scenario, we are using a 3rd node as a nfs client. We do not want
+# the server to move to this node.
+pcs constraint location nfs-group avoids $PHD_ENV_nodes3
 
 # Wait for all resources to start
 phd_rsc_verify_start_all 60
@@ -101,12 +93,41 @@ touch /nfsshare/clientdata/clientsharefile
 # Remove that temporary location constraint now that the folders
 # are initialized on the shared storage mount
 pcs constraint location remove location-nfs-group-${PHD_ENV_nodes1}-INFINITY
-
-pcs cluster cib nfs-rsc.cib
-pcs -f nfs-rsc.cib resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo nfs_ip=$PHD_ENV_floating_ips1
-pcs -f nfs-rsc.cib resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync directory=/nfsshare/clientdata fsid=0
-pcs -f nfs-rsc.cib resource group add nfs-group nfs-daemon nfs-export
-
-pcs cluster cib-push nfs-rsc.cib
 ....
 
+##
+# NFS share setup
+##
+target=$PHD_ENV_nodes1
+....
+suffix=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+
+pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo --group nfs-group
+pcs resource create nfs-export exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync directory=/nfsshare/clientdata fsid=0 --group nfs-group
+pcs resource create nfs-ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24 --group nfs-group
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
+##
+# NFS client mount
+##
+target=$PHD_ENV_nodes3
+....
+
+systemctl start nfs-lock
+# mount the share
+pcs resource create nfs-client Filesystem device=${PHD_ENV_floating_ips1}:/nfsshare/clientdata  directory=/nfsclient fstype=nfs
+pcs constraint location nfs-client prefers $PHD_ENV_nodes3
+
+phd_rsc_verify_start_all 60
+
+# verify we can establish locking
+flock /nfsclient/clientsharefile -c "sleep 1"
+if [ $? -ne 0 ]; then
+	echo "Client failed to establish lock on nfs share file"
+	exit 1
+fi
+
+....
