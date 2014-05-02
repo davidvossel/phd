@@ -98,7 +98,7 @@ target=$PHD_ENV_nodes3
 
 systemctl start nfs-lock
 # mount the share
-pcs resource create nfs-client FileSystem device=${PHD_ENV_floating_ips1}:/nfsshare/clientdata  directory=/nfsclient fstype=nfs
+pcs resource create nfs-client Filesystem device=${PHD_ENV_floating_ips1}:/nfsshare/clientdata  directory=/nfsclient fstype=nfs
 pcs constraint location nfs-client prefers $PHD_ENV_nodes3
 
 phd_rsc_verify_start_all 60
