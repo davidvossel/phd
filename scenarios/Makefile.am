@@ -14,6 +14,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	iscsi-cleanup.scenario	\
 	mariadb-basic.scenario	\
 	nfs-basic.scenario	\
+	nfs-complex.scenario	\
 	nfs-shared-clvmd.scenario	\
 	remote-baremetal-basic.scenario	\
 	remote-container-basic.scenario	\

@@ -1,0 +1,138 @@
+# NFS server on clusterd lvm + shared storage
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+shared_storage=6
+floating_ips=2
+fence_cmd=1
+
+packages=pacemaker corosync pcs dlm lvm2 lvm2-cluster nfs-utils resource-agents
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize lvm
+##
+target=all
+....
+systemctl disable nfs-server
+systemctl stop nfs-server
+systemctl disable nfs-lock
+systemctl stop nfs-lock
+
+mkdir -p /mnt/nfs1
+mkdir -p /mnt/nfs2
+....
+
+##
+# Make the cluster storage partitions
+##
+target=$PHD_ENV_nodes1
+....
+
+ext4_create()
+{
+	dev=$1
+	mkfs.ext4 $dev
+	if [ $? -ne 0 ]; then
+		echo "Failed to make ext4 fs on dev, $dev"
+		exit 1
+	fi
+}
+
+ext4_create "$PHD_ENV_shared_storage1"
+ext4_create "$PHD_ENV_shared_storage2"
+ext4_create "$PHD_ENV_shared_storage3"
+ext4_create "$PHD_ENV_shared_storage4"
+ext4_create "$PHD_ENV_shared_storage5"
+ext4_create "$PHD_ENV_shared_storage6"
+....
+
+
+##
+# create nfs daemons
+##
+target=$PHD_ENV_nodes1
+....
+
+
+pcs resource create nfs-shared-info1 Filesystem device=${PHD_ENV_shared_storage5} directory=/mnt/nfs_sharedinfo_1 fstype=ext4 --group nfs-group1
+pcs resource create nfs-shared-info2 Filesystem device=${PHD_ENV_shared_storage6} directory=/mnt/nfs_sharedinfo_2 fstype=ext4 --group nfs-group2
+
+# put shares on separate nodes
+pcs constraint colocation add nfs-group1 with nfs-group2 -INFINITY
+
+pcs resource create nfs-daemon1 nfsserver nfs_shared_infodir=/mnt/nfs_sharedinfo_1 --group nfs-group1
+pcs resource create nfs-daemon2 nfsserver nfs_shared_infodir=/mnt/nfs_sharedinfo_2 --group nfs-group2
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....
+
+##
+# create exports
+##
+target=$PHD_ENV_nodes1
+....
+suffix1=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+suffix2=$(echo "$PHD_ENV_floating_ips2" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+
+#fsid 0 for both servers
+pcs resource create nfs1-export-root exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync directory=/mnt/nfs1 fsid=0 --group nfs-group1
+pcs resource create nfs2-export-root exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync directory=/mnt/nfs2 fsid=0 --group nfs-group2
+
+# create fs mounts for shares
+pcs resource create nfs1-fs1 Filesystem device=${PHD_ENV_shared_storage1} directory=/mnt/nfs1/export1 fstype=ext4 --group export1
+pcs resource create nfs1-export1 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync directory=/mnt/nfs1/export1 fsid=1 --group export1
+
+pcs resource create nfs1-fs2 Filesystem device=${PHD_ENV_shared_storage2} directory=/mnt/nfs1/export2 fstype=ext4 --group export2
+pcs resource create nfs1-export2 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync directory=/mnt/nfs1/export2 fsid=1 --group export2
+
+pcs resource create nfs2-fs1 Filesystem device=${PHD_ENV_shared_storage3} directory=/mnt/nfs2/export1 fstype=ext4 --group export2
+pcs resource create nfs2-export1 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync directory=/mnt/nfs2/export1 fsid=3 --group export3
+
+pcs resource create nfs2-fs2 Filesystem device=${PHD_ENV_shared_storage4} directory=/mnt/nfs2/export2 fstype=ext4 --group export4
+pcs resource create nfs2-export2 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync directory=/mnt/nfs2/export2 fsid=4 --group export4
+
+# server constraints
+pcs constraint order start nfs-group1 then export1
+pcs constraint order start nfs-group1 then export2
+pcs constraint colocation add export1 with nfs-group1
+pcs constraint colocation add export2 with nfs-group1
+
+pcs constraint order start nfs-group2 then export3
+pcs constraint order start nfs-group2 then export4
+pcs constraint colocation add export3 with nfs-group2
+pcs constraint colocation add export4 with nfs-group2
+....
+
+##
+# floating ips
+##
+target=$PHD_ENV_nodes1
+....
+pcs resource create vip1 IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24
+pcs resource create vip2 IPaddr2 ip=$PHD_ENV_floating_ips2 cidr_netmask=24
+
+pcs constraint colocation add vip1 with nfs-group1
+pcs constraint colocation add vip2 with nfs-group2
+
+pcs constraint order start export1 then vip1
+pcs constraint order start export2 then vip1
+pcs constraint order start export3 then vip1
+pcs constraint order start export4 then vip1
+
+pcs constraint order start export1 then vip2
+pcs constraint order start export2 then vip2
+pcs constraint order start export3 then vip2
+pcs constraint order start export4 then vip2
+....
+
