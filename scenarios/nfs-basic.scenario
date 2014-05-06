@@ -104,6 +104,11 @@ pcs constraint location nfs-client prefers $PHD_ENV_nodes3
 phd_rsc_verify_start_all 60
 
 # verify we can establish locking
+if ! [ -f "/nfsclient/clientsharefile" ]; then
+	echo "Client failed to access client share file"
+	exit 1
+fi
+
 flock /nfsclient/clientsharefile -c "sleep 1"
 if [ $? -ne 0 ]; then
 	echo "Client failed to establish lock on nfs share file"
