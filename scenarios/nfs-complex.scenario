@@ -45,6 +45,11 @@ ext4_create()
 		echo "Failed to make ext4 fs on dev, $dev"
 		exit 1
 	fi
+
+	# put a file with a consistent name on each filesystem so we can test locks
+	mount $dev /mnt/nfs1
+	echo "test client file" > /mnt/nfs1/clientdatafile
+	umount /mnt/nfs1
 }
 
 ext4_create "$PHD_ENV_shared_storage1"
@@ -61,7 +66,6 @@ ext4_create "$PHD_ENV_shared_storage6"
 ##
 target=$PHD_ENV_nodes1
 ....
-
 
 pcs resource create nfs-shared-info1 Filesystem device=${PHD_ENV_shared_storage5} directory=/mnt/nfs_sharedinfo_1 fstype=ext4 --group nfs-group1
 pcs resource create nfs-shared-info2 Filesystem device=${PHD_ENV_shared_storage6} directory=/mnt/nfs_sharedinfo_2 fstype=ext4 --group nfs-group2
@@ -85,21 +89,21 @@ suffix1=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}
 suffix2=$(echo "$PHD_ENV_floating_ips2" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
 
 #fsid 0 for both servers
-pcs resource create nfs1-export-root exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync directory=/mnt/nfs1 fsid=0 --group nfs-group1
-pcs resource create nfs2-export-root exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync directory=/mnt/nfs2 fsid=0 --group nfs-group2
+pcs resource create nfs1-export-root exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1 fsid=0 --group nfs-group1
+pcs resource create nfs2-export-root exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2 fsid=0 --group nfs-group2
 
 # create fs mounts for shares
 pcs resource create nfs1-fs1 Filesystem device=${PHD_ENV_shared_storage1} directory=/mnt/nfs1/export1 fstype=ext4 --group export1
-pcs resource create nfs1-export1 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync directory=/mnt/nfs1/export1 fsid=1 --group export1
+pcs resource create nfs1-export1 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1/export1 fsid=1 --group export1
 
 pcs resource create nfs1-fs2 Filesystem device=${PHD_ENV_shared_storage2} directory=/mnt/nfs1/export2 fstype=ext4 --group export2
-pcs resource create nfs1-export2 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync directory=/mnt/nfs1/export2 fsid=1 --group export2
+pcs resource create nfs1-export2 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1/export2 fsid=2 --group export2
 
 pcs resource create nfs2-fs1 Filesystem device=${PHD_ENV_shared_storage3} directory=/mnt/nfs2/export1 fstype=ext4 --group export3
-pcs resource create nfs2-export1 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync directory=/mnt/nfs2/export1 fsid=3 --group export3
+pcs resource create nfs2-export1 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2/export1 fsid=3 --group export3
 
 pcs resource create nfs2-fs2 Filesystem device=${PHD_ENV_shared_storage4} directory=/mnt/nfs2/export2 fstype=ext4 --group export4
-pcs resource create nfs2-export2 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync directory=/mnt/nfs2/export2 fsid=4 --group export4
+pcs resource create nfs2-export2 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2/export2 fsid=4 --group export4
 
 # server constraints
 pcs constraint order start nfs-group1 then export1
@@ -111,6 +115,9 @@ pcs constraint order start nfs-group2 then export3
 pcs constraint order start nfs-group2 then export4
 pcs constraint colocation add export3 with nfs-group2
 pcs constraint colocation add export4 with nfs-group2
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
 ....
 
 ##
@@ -133,6 +140,9 @@ pcs constraint order start export1 then vip2
 pcs constraint order start export2 then vip2
 pcs constraint order start export3 then vip2
 pcs constraint order start export4 then vip2
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
 ....
 
 ##
@@ -140,19 +150,58 @@ pcs constraint order start export4 then vip2
 ##
 target=$PHD_ENV_nodes4
 ....
-
 systemctl start nfs-lock
 
 # keep the servers off this client node
 pcs constraint location nfs-group1 avoids $PHD_ENV_nodes4
 pcs constraint location nfs-group2 avoids $PHD_ENV_nodes4
 
+
+tmpfile=$(mktemp tmpcibXXXXX)
+pcs cluster cib $tmpfile
+
 # mount the first nfs server as nfsv4
-pcs resource create nfs-client-v4 Filesystem device=${PHD_ENV_floating_ips1}:/  directory=/nfsclientv4 fstype=nfs4
+pcs -f $tmpfile resource create nfs-client-v4 Filesystem device=${PHD_ENV_floating_ips1}:/  directory=/nfsclientv4 fstype=nfs4
 
 # mount the second one using nfsv3
-pcs resource create nfs-client-v3 Filesystem device=${PHD_ENV_floating_ips2}:/mnt/nfs2  directory=/nfsclientv3 fstype=nfs
+pcs -f $tmpfile resource create nfs-client-v3 Filesystem device=${PHD_ENV_floating_ips2}:/mnt/nfs2/export1  directory=/nfsclientv3 fstype=nfs
 
-pcs constraint location nfs-client-v3 prefers $PHD_ENV_nodes4
-pcs constraint location nfs-client-v4 prefers $PHD_ENV_nodes4
+pcs -f $tmpfile constraint location nfs-client-v3 prefers $PHD_ENV_nodes4
+pcs -f $tmpfile constraint location nfs-client-v4 prefers $PHD_ENV_nodes4
+
+pcs cluster cib-push $tmpfile
+rm -f $tmpfile
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....
+
+##
+# sanity test client locking 
+##
+target=$PHD_ENV_nodes4
+....
+
+# verify we can establish locking
+if ! [ -f "/nfsclientv3/clientdatafile" ]; then
+	echo "Client failed to access client share file on nfsv3 mount"
+	exit 1
+fi
+
+flock /nfsclientv3/clientdatafile -c "sleep 1"
+if [ $? -ne 0 ]; then
+	echo "Client failed to establish lock on nfsv3 share file"
+	exit 1
+fi
+
+if ! [ -f "/nfsclientv4/export1/clientdatafile" ]; then
+	echo "Client failed to access client share file on nfsv4 mount"
+	exit 1
+fi
+flock /nfsclientv4/export1/clientdatafile -c "sleep 1"
+if [ $? -ne 0 ]; then
+	echo "Client failed to establish lock on nfsv4 share file"
+	exit 1
+fi
+
 ....
