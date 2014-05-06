@@ -96,7 +96,7 @@ pcs resource create nfs1-export1 exportfs clientspec=${suffix1}/255.255.255.0  o
 pcs resource create nfs1-fs2 Filesystem device=${PHD_ENV_shared_storage2} directory=/mnt/nfs1/export2 fstype=ext4 --group export2
 pcs resource create nfs1-export2 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync directory=/mnt/nfs1/export2 fsid=1 --group export2
 
-pcs resource create nfs2-fs1 Filesystem device=${PHD_ENV_shared_storage3} directory=/mnt/nfs2/export1 fstype=ext4 --group export2
+pcs resource create nfs2-fs1 Filesystem device=${PHD_ENV_shared_storage3} directory=/mnt/nfs2/export1 fstype=ext4 --group export3
 pcs resource create nfs2-export1 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync directory=/mnt/nfs2/export1 fsid=3 --group export3
 
 pcs resource create nfs2-fs2 Filesystem device=${PHD_ENV_shared_storage4} directory=/mnt/nfs2/export2 fstype=ext4 --group export4
