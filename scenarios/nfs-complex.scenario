@@ -4,12 +4,11 @@
 # Scenario Requirements Section #
 #################################
 = REQUIREMENTS =
-nodes=2
+nodes=4
 shared_storage=6
 floating_ips=2
-fence_cmd=1
 
-packages=pacemaker corosync pcs dlm lvm2 lvm2-cluster nfs-utils resource-agents
+packages=pacemaker corosync pcs nfs-utils resource-agents
 cluster_init=1
 clean_shared_storage=1
 
@@ -136,3 +135,24 @@ pcs constraint order start export3 then vip2
 pcs constraint order start export4 then vip2
 ....
 
+##
+# client mounts
+##
+target=$PHD_ENV_nodes4
+....
+
+systemctl start nfs-lock
+
+# keep the servers off this client node
+pcs constraint location nfs-group1 avoids $PHD_ENV_nodes4
+pcs constraint location nfs-group2 avoids $PHD_ENV_nodes4
+
+# mount the first nfs server as nfsv4
+pcs resource create nfs-client-v4 Filesystem device=${PHD_ENV_floating_ips1}:/  directory=/nfsclientv4 fstype=nfs4
+
+# mount the second one using nfsv3
+pcs resource create nfs-client-v3 Filesystem device=${PHD_ENV_floating_ips2}:/mnt/nfs2  directory=/nfsclientv3 fstype=nfs
+
+pcs constraint location nfs-client-v3 prefers $PHD_ENV_nodes4
+pcs constraint location nfs-client-v4 prefers $PHD_ENV_nodes4
+....
