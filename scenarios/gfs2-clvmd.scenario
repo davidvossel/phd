@@ -69,7 +69,7 @@ fi
 ....
 
 ##
-# Make the lvm resources and floating ip
+# Make the gfs2 resource clone
 ##
 target=$PHD_ENV_nodes1
 ....
