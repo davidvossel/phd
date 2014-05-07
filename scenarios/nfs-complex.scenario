@@ -133,11 +133,7 @@ pcs constraint colocation add vip2 with nfs-group2
 
 pcs constraint order start export1 then vip1
 pcs constraint order start export2 then vip1
-pcs constraint order start export3 then vip1
-pcs constraint order start export4 then vip1
 
-pcs constraint order start export1 then vip2
-pcs constraint order start export2 then vip2
 pcs constraint order start export3 then vip2
 pcs constraint order start export4 then vip2
 
