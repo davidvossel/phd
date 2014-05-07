@@ -88,22 +88,25 @@ target=$PHD_ENV_nodes1
 suffix1=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
 suffix2=$(echo "$PHD_ENV_floating_ips2" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
 
+# NOTE without setting wait_for_leasetime_on_stop=true, the exported fs will
+# not be able to unmount if a nfsv4 client has an active file lease
+
 #fsid 0 for both servers
-pcs resource create nfs1-export-root exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1 fsid=0 --group nfs-group1
-pcs resource create nfs2-export-root exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2 fsid=0 --group nfs-group2
+pcs resource create nfs1-export-root exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1 wait_for_leasetime_on_stop=true fsid=0 --group nfs-group1
+pcs resource create nfs2-export-root exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2 wait_for_leasetime_on_stop=true fsid=0 --group nfs-group2
 
 # create fs mounts for shares
 pcs resource create nfs1-fs1 Filesystem device=${PHD_ENV_shared_storage1} directory=/mnt/nfs1/export1 fstype=ext4 --group export1
-pcs resource create nfs1-export1 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1/export1 fsid=1 --group export1
+pcs resource create nfs1-export1 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1/export1 wait_for_leasetime_on_stop=true fsid=1 --group export1
 
 pcs resource create nfs1-fs2 Filesystem device=${PHD_ENV_shared_storage2} directory=/mnt/nfs1/export2 fstype=ext4 --group export2
-pcs resource create nfs1-export2 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1/export2 fsid=2 --group export2
+pcs resource create nfs1-export2 exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs1/export2 wait_for_leasetime_on_stop=true fsid=2 --group export2
 
 pcs resource create nfs2-fs1 Filesystem device=${PHD_ENV_shared_storage3} directory=/mnt/nfs2/export1 fstype=ext4 --group export3
-pcs resource create nfs2-export1 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2/export1 fsid=3 --group export3
+pcs resource create nfs2-export1 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2/export1 wait_for_leasetime_on_stop=true fsid=3 --group export3
 
 pcs resource create nfs2-fs2 Filesystem device=${PHD_ENV_shared_storage4} directory=/mnt/nfs2/export2 fstype=ext4 --group export4
-pcs resource create nfs2-export2 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2/export2 fsid=4 --group export4
+pcs resource create nfs2-export2 exportfs clientspec=${suffix2}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/nfs2/export2 wait_for_leasetime_on_stop=true fsid=4 --group export4
 
 # server constraints
 pcs constraint order start nfs-group1 then export1
