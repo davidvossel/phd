@@ -1,4 +1,4 @@
-# NFS server on clusterd lvm + shared storage
+# NFS server with multiple  nfsv4/nfsv3 exports
 
 #################################
 # Scenario Requirements Section #
