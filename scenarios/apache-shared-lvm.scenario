@@ -21,6 +21,11 @@ clean_shared_storage=1
 ##
 target=all
 ....
+
+systemctl disable lvm2-lvmetad.service
+systemctl stop lvm2-lvmetad.service
+
+
 grep "^<Location /server-status" /etc/httpd/conf/httpd.conf
 if [ "$?" -ne "0" ]; then
 	cat << END >>  /etc/httpd/conf/httpd.conf
