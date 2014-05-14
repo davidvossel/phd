@@ -1,0 +1,141 @@
+# ACTIVE PASSIVE NFS using v3 and v4
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=3
+shared_storage=1
+floating_ips=1
+
+packages=pacemaker corosync pcs nfs-utils resource-agents
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize lvm
+##
+target=all
+....
+systemctl disable nfs-server
+systemctl stop nfs-server
+systemctl disable nfs-lock
+systemctl stop nfs-lock
+
+exit 0
+....
+
+##
+# make the shared storage partition
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+mkfs.ext4 $dev
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+
+mkdir /nfsshare
+mount $dev /nfsshare
+mkdir -p /nfsshare/exports
+mkdir -p /nfsshare/exports/export1
+mkdir -p /nfsshare/exports/export2/
+touch /nfsshare/exports/export1/clientsharefile1
+touch /nfsshare/exports/export2/clientsharefile2
+umount /nfsshare
+....
+
+##
+# Make nfs daemon
+##
+target=$PHD_ENV_nodes1
+....
+dev=$PHD_ENV_shared_storage1
+
+pcs resource create nfs-share Filesystem device=${dev} directory=/nfsshare fstype=ext4 --group nfs-group
+pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo --group nfs-group
+
+# For this scenario, we are using a 3rd node as a nfs client.
+# We do not want the server to move to this node.
+pcs constraint location nfs-group avoids $PHD_ENV_nodes3
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
+##
+# NFS exports and Floating IP
+##
+target=$PHD_ENV_nodes1
+....
+suffix=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+
+pcs resource create export-root exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync,no_root_squash directory=/nfsshare/exports fsid=0 --group nfs-group
+pcs resource create export-1 exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync,no_root_squash directory=/nfsshare/exports/export1 fsid=1 --group nfs-group
+pcs resource create export-2 exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync,no_root_squash directory=/nfsshare/exports/export2 fsid=2 --group nfs-group
+pcs resource create nfs-ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24 --group nfs-group
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
+##
+# NFS v3 client mount
+##
+target=$PHD_ENV_nodes3
+....
+
+systemctl start nfs-lock
+
+# mount the share
+pcs resource create nfs-client-v3 Filesystem device=${PHD_ENV_floating_ips1}:/nfsshare/exports/export1  directory=/nfsclientv3 fstype=nfs
+pcs constraint location nfs-client-v3 prefers $PHD_ENV_nodes3
+
+phd_rsc_verify_start_all 60
+
+# verify we can establish locking
+if ! [ -f "/nfsclientv3/clientsharefile1" ]; then
+	echo "Client failed to access client share file"
+	exit 1
+fi
+
+flock /nfsclientv3/clientsharefile1 -c "sleep 1"
+if [ $? -ne 0 ]; then
+	echo "Client failed to establish lock on nfs share file"
+	exit 1
+fi
+
+....
+
+##
+# NFS v4 client mount
+##
+target=$PHD_ENV_nodes3
+....
+
+# mount the share
+pcs resource create nfs-client-v4 Filesystem device=${PHD_ENV_floating_ips1}:/  directory=/nfsclientv4 fstype=nfs4
+pcs constraint location nfs-client-v4 prefers $PHD_ENV_nodes3
+
+phd_rsc_verify_start_all 60
+# verify we can establish locking
+if ! [ -f "/nfsclientv4/export2/clientsharefile2" ]; then
+	echo "Client failed to access client share file"
+	exit 1
+fi
+
+flock /nfsclientv4/export2/clientsharefile2 -c "sleep 1"
+if [ $? -ne 0 ]; then
+	echo "Client failed to establish lock on nfs share file"
+	exit 1
+fi
+
+....
