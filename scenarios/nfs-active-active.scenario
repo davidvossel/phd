@@ -1,0 +1,175 @@
+# ACTIVE ACTIVE NFS server
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=4
+shared_storage=6
+floating_ips=2
+
+packages=pacemaker corosync pcs nfs-utils resource-agents
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize lvm
+##
+target=all
+....
+systemctl disable nfs-server
+systemctl stop nfs-server
+systemctl disable nfs-lock
+systemctl stop nfs-lock
+
+mkdir -p /mnt/exports
+....
+
+##
+# Make the cluster storage partitions
+##
+target=$PHD_ENV_nodes1
+....
+
+ext4_create()
+{
+	dev=$1
+	mkfs.ext4 $dev
+	if [ $? -ne 0 ]; then
+		echo "Failed to make ext4 fs on dev, $dev"
+		exit 1
+	fi
+
+	# put a file with a consistent name on each filesystem so we can test locks
+	mount $dev /mnt/nfs1
+	echo "test client file" > /mnt/nfs1/clientdatafile
+	umount /mnt/nfs1
+}
+
+ext4_create "$PHD_ENV_shared_storage1"
+ext4_create "$PHD_ENV_shared_storage2"
+ext4_create "$PHD_ENV_shared_storage3"
+ext4_create "$PHD_ENV_shared_storage4"
+....
+
+##
+# create nfs daemons
+##
+target=$PHD_ENV_nodes1
+....
+suffix1=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+
+tmpfile=$(mktemp tmpcibXXXXX)
+pcs cluster cib $tmpfile
+
+pcs -f $tmpfile resource create nfs-daemon nfsserver v4gracetime=15 v4leasetime=10 --group nfs-group
+pcs -f $tmpfile resource create export-root exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/exports fsid=0 --group nfs-group
+pcs -f $tmpfile resource clone nfs-group interleave=true
+
+# keep the servers off the client node
+pcs -f $tmpfile constraint location nfs-group-clone avoids $PHD_ENV_nodes4
+
+pcs cluster cib-push $tmpfile
+rm -f $tmpfile
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....
+
+##
+# create exports
+##
+target=$PHD_ENV_nodes1
+....
+suffix1=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+suffix2=$(echo "$PHD_ENV_floating_ips2" | awk -F. '{print $1 "." $2 "." $3 ".0"}')
+
+tmpfile=$(mktemp tmpcibXXXXX)
+pcs cluster cib $tmpfile
+
+# create fs mounts for shares
+pcs -f $tmpfile resource create fs1 Filesystem device=${PHD_ENV_shared_storage1} directory=/mnt/exports/export1 fstype=ext4 --group fs-group1
+pcs -f $tmpfile resource create fs2 Filesystem device=${PHD_ENV_shared_storage2} directory=/mnt/exports/export2 fstype=ext4 --group fs-group1
+
+pcs -f $tmpfile resource create fs3 Filesystem device=${PHD_ENV_shared_storage3} directory=/mnt/exports/export3 fstype=ext4 --group fs-group2
+pcs -f $tmpfile resource create fs4 Filesystem device=${PHD_ENV_shared_storage4} directory=/mnt/exports/export4 fstype=ext4 --group fs-group2
+
+pcs -f $tmpfile resource create export1 exportfs clientspec=${suffix1}/255.255.255.0 options=rw,sync,no_root_squash directory=/mnt/exports/export1 fsid=1 --group export-group1
+pcs -f $tmpfile resource create export2 exportfs clientspec=${suffix1}/255.255.255.0 options=rw,sync,no_root_squash directory=/mnt/exports/export2 fsid=2 --group export-group1
+pcs -f $tmpfile resource create vip1 IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24 --group export-group1
+
+pcs -f $tmpfile resource create export3 exportfs clientspec=${suffix2}/255.255.255.0 options=rw,sync,no_root_squash directory=/mnt/exports/export3 fsid=3 --group export-group2
+pcs -f $tmpfile resource create export4 exportfs clientspec=${suffix2}/255.255.255.0 options=rw,sync,no_root_squash directory=/mnt/exports/export4 fsid=4 --group export-group2
+pcs -f $tmpfile resource create vip2 IPaddr2 ip=$PHD_ENV_floating_ips2 cidr_netmask=24 --group export-group2
+
+# order and colocate file systems with nfs daemons
+pcs -f $tmpfile constraint order fs-group1 then nfs-group-clone
+pcs -f $tmpfile constraint order fs-group2 then nfs-group-clone
+pcs -f $tmpfile constraint colocation add fs-group1 with nfs-group-clone
+pcs -f $tmpfile constraint colocation add fs-group2 with nfs-group-clone
+
+# order and colocate file systems with their exports
+pcs -f $tmpfile constraint order fs-group1 then export-group1
+pcs -f $tmpfile constraint order fs-group2 then export-group2
+pcs -f $tmpfile constraint colocation add export-group1 with fs-group1
+pcs -f $tmpfile constraint colocation add export-group2 with fs-group2
+
+# order nfs daemons before exports+vip groups
+pcs -f $tmpfile constraint order nfs-group-clone then export-group1
+pcs -f $tmpfile constraint order nfs-group-clone then export-group2
+
+pcs cluster cib-push $tmpfile
+rm -f $tmpfile
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....
+
+##
+# client mounts
+##
+target=$PHD_ENV_nodes4
+....
+systemctl start nfs-lock
+
+
+tmpfile=$(mktemp tmpcibXXXXX)
+pcs cluster cib $tmpfile
+
+# mount the first nfs server as nfsv4
+pcs -f $tmpfile resource create nfs-client-v4 Filesystem device=${PHD_ENV_floating_ips1}:/  directory=/nfsclientv4 fstype=nfs4
+
+# mount the second one using nfsv3
+pcs -f $tmpfile resource create nfs-client-v3 Filesystem device=${PHD_ENV_floating_ips2}:/mnt/exports/export3  directory=/nfsclientv3 fstype=nfs
+
+pcs -f $tmpfile constraint location nfs-client-v3 prefers $PHD_ENV_nodes4
+pcs -f $tmpfile constraint location nfs-client-v4 prefers $PHD_ENV_nodes4
+
+pcs cluster cib-push $tmpfile
+rm -f $tmpfile
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....
+
+##
+# sanity test client access
+##
+target=$PHD_ENV_nodes4
+....
+
+if ! [ -f "/nfsclientv3/clientdatafile" ]; then
+	echo "Client failed to access client share file on nfsv3 mount"
+	exit 1
+fi
+
+if ! [ -f "/nfsclientv4/export1/clientdatafile" ]; then
+	echo "Client failed to access client share file on nfsv4 mount"
+	exit 1
+fi
+....
