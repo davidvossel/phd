@@ -67,7 +67,7 @@ suffix1=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}
 tmpfile=$(mktemp tmpcibXXXXX)
 pcs cluster cib $tmpfile
 
-pcs -f $tmpfile resource create nfs-daemon nfsserver v4gracetime=15 v4leasetime=10 --group nfs-group
+pcs -f $tmpfile resource create nfs-daemon nfsserver nfsd_args="-G 20 -L 15" --group nfs-group
 pcs -f $tmpfile resource create export-root exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/exports fsid=0 --group nfs-group
 pcs -f $tmpfile resource clone nfs-group interleave=true
 
