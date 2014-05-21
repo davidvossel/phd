@@ -5,12 +5,35 @@
 # 
 # that creates rhel7-auto1, rhel7-auto2, rhel7-auto3, rhel7-auto4 with
 # ip addresses 192.168.122.171 192.168.122.172 192.168.122.173 192.168.122.173
+#
+#
+# do this stuff on the base img manually before running this.
+#
+# delete /etc/hostname
+# delete hwaddr and uuid in ifcfg-eth0 make sure eth0 starts on boot
+# setup ssh keys
+# make /etc/hosts
+# set yum repos
+# install git + src
+# setup firewalld rules so corosync works
+# setup fence_xvm keys and install fence-agents
+#
 
 baseimg=$1
 basexml=$2
-ipstart=$3
+ip=$3
 node_prefix=$4
 instances=$5
+
+if [ -z "$5" ]; then
+	echo "usage - $0 <base-img-path> <base-img-xml> <ip start> <node-name-prefix> <number instances>"
+	exit 1
+fi
+
+ipstart=$(echo "$ip" | awk -F. '{print $4}')
+if [ -z "$ipstart" ]; then
+	ipstart=$ip
+fi
 
 rm -f cur_network.xml
 
@@ -70,4 +93,8 @@ do
 	virsh define ${node_prefix}${c}.xml
 	virsh start ${node_prefix}${c}
 done
+
+# fence_virtd freaks out when we re-define the libvirt network.
+killall -9 fence_virtd
+fence_virtd -d2
 
