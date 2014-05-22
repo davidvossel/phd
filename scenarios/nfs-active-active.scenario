@@ -5,7 +5,7 @@
 #################################
 = REQUIREMENTS =
 nodes=4
-shared_storage=6
+shared_storage=4
 floating_ips=2
 
 packages=pacemaker corosync pcs nfs-utils resource-agents
