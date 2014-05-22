@@ -88,9 +88,21 @@ virsh net-define cur_network.xml
 virsh net-start default
 virsh net-autostart default
 
+# make shared storage
+rm -f ${node_prefix}-shared*
+fallocate -l 1G ${node_prefix}-vdb.img
+fallocate -l 1G ${node_prefix}-vdc.img
+fallocate -l 1G ${node_prefix}-vdd.img
+fallocate -l 1G ${node_prefix}-vde.img
+
 for (( c=1; c <= $instances; c++ ))
 do
 	virsh define ${node_prefix}${c}.xml
+	# attach shared storage
+	virsh attach-disk ${node_prefix}${c} ${PWD}/${node_prefix}-vdb.img vdb --persistent --shareable --driver qemu --subdriver raw --cache none --type disk
+	virsh attach-disk ${node_prefix}${c} ${PWD}/${node_prefix}-vdc.img vdc --persistent --shareable --driver qemu --subdriver raw --cache none --type disk
+	virsh attach-disk ${node_prefix}${c} ${PWD}/${node_prefix}-vdd.img vdd --persistent --shareable --driver qemu --subdriver raw --cache none --type disk
+	virsh attach-disk ${node_prefix}${c} ${PWD}/${node_prefix}-vde.img vde --persistent --shareable --driver qemu --subdriver raw --cache none --type disk
 	virsh start ${node_prefix}${c}
 done
 
