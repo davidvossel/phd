@@ -46,9 +46,9 @@ ext4_create()
 	fi
 
 	# put a file with a consistent name on each filesystem so we can test locks
-	mount $dev /mnt/nfs1
-	echo "test client file" > /mnt/nfs1/clientdatafile
-	umount /mnt/nfs1
+	mount $dev /mnt/exports
+	echo "test client file" > /mnt/exports/clientdatafile
+	umount /mnt/exports
 }
 
 ext4_create "$PHD_ENV_shared_storage1"
