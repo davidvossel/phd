@@ -75,6 +75,9 @@ do
 	echo "<host mac='$mac' name='${node_prefix}${c}' ip='$ip' />" >> cur_network.xml
 done
 
+# preserve any other custom host definitions
+virsh net-dumpxml default | grep host | grep -v "${node_prefix}" >> cur_network.xml
+
 cat << END >> cur_network.xml
     </dhcp>
   </ip>
