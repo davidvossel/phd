@@ -1,0 +1,42 @@
+# test deployment of iSCSILogicalUnit resource
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=1
+packages=pacemaker corosync pcs scsi-target-utils
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Make the cluster apache and floating ip resources
+##
+target=$PHD_ENV_nodes1
+....
+
+iqn=iqn.2001-04.com.example:storage.disk2.amiens.sys1.xyz
+
+pcs resource create tgtd lsb:tgtd op monitor interval=30s --group iscsi-targets
+pcs constraint location iscsi-targets prefers $PHD_ENV_nodes1
+phd_rsc_verify_start_all 90
+
+# cleanup previous run
+tgtadm --lld iscsi --op delete --mode target --tid 1
+rm -rf /luns
+
+# create iqn
+tgtadm --lld iscsi --op new --mode target --tid 1 -T iqn.2001-04.com.example:storage.disk2.amiens.sys1.xyz
+tgtadm --lld iscsi --op show --mode target
+
+mkdir /luns
+fallocate -l 64M /luns/lun1
+
+pcs resource create lun1 iSCSILogicalUnit lun=1 target_iqn=${iqn} path=/luns/lun1 --group iscsi-targets
+phd_rsc_verify_start_all 90
+....
+
