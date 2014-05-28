@@ -124,7 +124,14 @@ devices="$shared_dev"
 sed -i.bak "s/.*[[:space:]]volume_list =.*/#volume_list = /g" /etc/lvm/lvm.conf
 sed -i.bak "s/^volume_list.*=.*/#volume_list = /g" /etc/lvm/lvm.conf
 for dev in \$(echo \$devices); do
-	for vg in \$(pvs --noheadings \$dev | awk '{print \$2}'); do
+	output="\$(pvs --noheadings \$dev)"
+	if [ $? -ne 0 ]; then
+		fuser -mkv \$dev
+		umount \$dev
+		continue
+	fi
+
+	for vg in \$(echo "\$output" | awk '{print \$2}'); do
 		for lv in \$(lvs vg_normal --noheadings | awk '{print \$1}'); do
 			fuser -mkv /dev/\$vg/\$lv
 			umount /dev/\$vg/\$lv
