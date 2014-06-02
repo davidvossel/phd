@@ -37,6 +37,7 @@ exit 0
 ##
 target=all
 ....
+service libvirtd start
 systemctl disable pacemaker
 systemctl disable corosync
 chkconfig pacemaker off
