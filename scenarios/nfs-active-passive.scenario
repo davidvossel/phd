@@ -24,8 +24,6 @@ target=all
 ....
 systemctl disable nfs-server
 systemctl stop nfs-server
-systemctl disable nfs-lock
-systemctl stop nfs-lock
 
 exit 0
 ....
