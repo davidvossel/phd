@@ -22,8 +22,17 @@ clean_shared_storage=1
 ##
 target=all
 ....
+floater=$PHD_ENV_floating_ips1
+
 systemctl disable nfs-server
 systemctl stop nfs-server
+
+# Give the floating ip used for the NFS server
+# a hostname 'floater'. This is required for sm-notify
+# to work correctly during NFSv3 lock recovery. Clients
+# use this hostname when connecting to the server
+sed -i.bak "s/^...\....\....\..* floater.*$//p" /etc/hosts
+echo "$floater floater" >> /etc/hosts
 
 exit 0
 ....
@@ -59,7 +68,7 @@ target=$PHD_ENV_nodes1
 dev=$PHD_ENV_shared_storage1
 
 pcs resource create nfs-share Filesystem device=${dev} directory=/nfsshare fstype=ext4 --group nfs-group
-pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo --group nfs-group
+pcs resource create nfs-daemon nfsserver nfs_shared_infodir=/nfsshare/nfsinfo nfs_no_notify=true --group nfs-group
 
 # For this scenario, we are using a 3rd node as a nfs client.
 # We do not want the server to move to this node.
@@ -80,6 +89,7 @@ pcs resource create export-root exportfs clientspec=${suffix}/255.255.255.0  opt
 pcs resource create export-1 exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync,no_root_squash directory=/nfsshare/exports/export1 fsid=1 --group nfs-group
 pcs resource create export-2 exportfs clientspec=${suffix}/255.255.255.0  options=rw,sync,no_root_squash directory=/nfsshare/exports/export2 fsid=2 --group nfs-group
 pcs resource create nfs-ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24 --group nfs-group
+pcs resource create nfs-notify nfsnotify source_host=$PHD_ENV_floating_ips1 --group nfs-group
 
 # Wait for all resources to start
 phd_rsc_verify_start_all 60
@@ -94,7 +104,7 @@ target=$PHD_ENV_nodes3
 systemctl start nfs-lock
 
 # mount the share
-pcs resource create nfs-client-v3 Filesystem device=${PHD_ENV_floating_ips1}:/nfsshare/exports/export1  directory=/nfsclientv3 fstype=nfs
+pcs resource create nfs-client-v3 Filesystem device=floater:/nfsshare/exports/export1  directory=/nfsclientv3 fstype=nfs
 pcs constraint location nfs-client-v3 prefers $PHD_ENV_nodes3
 
 phd_rsc_verify_start_all 60
@@ -120,7 +130,7 @@ target=$PHD_ENV_nodes3
 ....
 
 # mount the share
-pcs resource create nfs-client-v4 Filesystem device=${PHD_ENV_floating_ips1}:/  directory=/nfsclientv4 fstype=nfs4
+pcs resource create nfs-client-v4 Filesystem device=floater:/  directory=/nfsclientv4 fstype=nfs4
 pcs constraint location nfs-client-v4 prefers $PHD_ENV_nodes3
 
 phd_rsc_verify_start_all 60
