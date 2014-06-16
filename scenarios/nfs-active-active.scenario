@@ -4,7 +4,7 @@
 # Scenario Requirements Section #
 #################################
 = REQUIREMENTS =
-nodes=4
+nodes=3
 shared_storage=4
 floating_ips=2
 
@@ -67,12 +67,12 @@ suffix1=$(echo "$PHD_ENV_floating_ips1" | awk -F. '{print $1 "." $2 "." $3 ".0"}
 tmpfile=$(mktemp tmpcibXXXXX)
 pcs cluster cib $tmpfile
 
-pcs -f $tmpfile resource create nfs-daemon nfsserver nfsd_args="-G 20 -L 15" --group nfs-group
+pcs -f $tmpfile resource create nfs-daemon nfsserver --group nfs-group
 pcs -f $tmpfile resource create export-root exportfs clientspec=${suffix1}/255.255.255.0  options=rw,sync,no_root_squash directory=/mnt/exports fsid=0 --group nfs-group
 pcs -f $tmpfile resource clone nfs-group interleave=true
 
 # keep the servers off the client node
-pcs -f $tmpfile constraint location nfs-group-clone avoids $PHD_ENV_nodes4
+pcs -f $tmpfile constraint location nfs-group-clone avoids $PHD_ENV_nodes3
 
 pcs cluster cib-push $tmpfile
 rm -f $tmpfile
@@ -133,7 +133,7 @@ phd_rsc_verify_start_all 90
 ##
 # client mounts
 ##
-target=$PHD_ENV_nodes4
+target=$PHD_ENV_nodes3
 ....
 systemctl start nfs-lock
 
@@ -147,8 +147,8 @@ pcs -f $tmpfile resource create nfs-client-v4 Filesystem device=${PHD_ENV_floati
 # mount the second one using nfsv3
 pcs -f $tmpfile resource create nfs-client-v3 Filesystem device=${PHD_ENV_floating_ips2}:/mnt/exports/export3  directory=/nfsclientv3 fstype=nfs
 
-pcs -f $tmpfile constraint location nfs-client-v3 prefers $PHD_ENV_nodes4
-pcs -f $tmpfile constraint location nfs-client-v4 prefers $PHD_ENV_nodes4
+pcs -f $tmpfile constraint location nfs-client-v3 prefers $PHD_ENV_nodes3
+pcs -f $tmpfile constraint location nfs-client-v4 prefers $PHD_ENV_nodes3
 
 pcs cluster cib-push $tmpfile
 rm -f $tmpfile
@@ -160,7 +160,7 @@ phd_rsc_verify_start_all 90
 ##
 # sanity test client access
 ##
-target=$PHD_ENV_nodes4
+target=$PHD_ENV_nodes3
 ....
 
 if ! [ -f "/nfsclientv3/clientdatafile" ]; then
