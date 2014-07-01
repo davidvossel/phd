@@ -48,7 +48,7 @@ package_install_custom()
 	fi
 
 	for entry in $(ls ${package_dir}*.rpm); do
-		packages="$packages $(rpm -qp -i $entry | grep -e 'Name' | sed 's/Name.*: //')"
+		packages="$packages $(rpm -qp -i $entry | grep  'Name' | awk  '{print $3}')"
 		rpms="$rpms $entry"
 		phd_node_cp "$entry" "$PHD_TMP_DIR/phd_rpms/" "$nodes"
 	done
