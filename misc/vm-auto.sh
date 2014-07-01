@@ -11,11 +11,14 @@
 #
 # delete /etc/hostname
 # delete hwaddr and uuid in ifcfg-eth0 make sure eth0 starts on boot
+# rhel6 - remove MAC from /etc/udev/rules.d/70-persistent-net.rules
 # setup ssh keys
 # make /etc/hosts
 # set yum repos
 # install git + src
 # setup firewalld rules so corosync works
+# rhel6 - chkconfig iptables off
+# rhel6 -chkconfig ip6tables off 
 # setup fence_xvm keys and install fence-agents
 #
 
