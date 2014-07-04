@@ -10,6 +10,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	cts-virt-remote.scenario	\
 	example.scenario	\
 	gfs2-clvmd.scenario	\
+	galera-basic.scenario	\
 	iscsi.scenario	\
 	iscsi-cleanup.scenario	\
 	iscsi-logicalunit.scenario	\

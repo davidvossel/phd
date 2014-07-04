@@ -1,0 +1,88 @@
+# HA galera instance on at least 3 nodes.
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=3
+packages=pacemaker corosync pcs mariadb-galera-server mariadb-galera-common galera rsync
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# kill a previous database so we are sure bootstrap and initial creation works.
+##
+target=all
+....
+rm -rf /var/lib/mysql/*
+....
+
+##
+# setup galera config
+##
+target=all
+....
+# TODO, this assumes there is a network address called eth0. make this dynamic
+
+cat > /etc/sysconfig/clustercheck << EOF
+MYSQL_USERNAME="clustercheck"
+MYSQL_PASSWORD="supersecretpasswd"
+MYSQL_HOST="localhost"
+MYSQL_PORT="3306"
+EOF
+
+cat > /etc/my.cnf.d/galera.cnf << EOF
+[mysqld]
+skip-name-resolve=1
+binlog_format=ROW
+default-storage-engine=innodb
+innodb_autoinc_lock_mode=2
+innodb_locks_unsafe_for_binlog=1
+query_cache_size=0
+query_cache_type=0
+bind-address=$(ip addr show dev eth0 scope global | grep inet | sed -e 's#.*inet ##g' -e 's#/.*##g')
+
+wsrep_provider=/usr/lib64/galera/libgalera_smm.so
+wsrep_cluster_name="galera_cluster"
+wsrep_slave_threads=1
+wsrep_certify_nonPK=1
+wsrep_max_ws_rows=131072
+wsrep_max_ws_size=1073741824
+wsrep_debug=0
+wsrep_convert_LOCK_to_trx=0
+wsrep_retry_autocommit=1
+wsrep_auto_increment_control=1
+wsrep_drupal_282555_workaround=0
+wsrep_causal_reads=0
+wsrep_notify_cmd=
+wsrep_sst_method=rsync
+EOF
+....
+
+##
+# Make the galera Master resources
+##
+target=$PHD_ENV_nodes1
+....
+# build the cluster address out of the available nodes
+# Example: gcomm://node1,node2,node3,node4
+
+gcomm="gcomm://"
+for node in $(echo $PHD_ENV_nodes); do
+	if [ "$gcomm" = "gcomm://" ]; then
+		gcomm="${gcomm}${node}"
+	else
+		gcomm="${gcomm},${node}"
+	fi
+done
+
+# Example: pcs resource create db galera enable_creation=true wsrep_cluster_address=gcomm://node1,node2,node3 meta master-max=3 --master
+pcs resource create db galera enable_creation=true wsrep_cluster_address=${gcomm} meta master-max=$(echo $PHD_ENV_nodes | wc -c) --master
+
+phd_rsc_verify_start_all 90
+....
+
