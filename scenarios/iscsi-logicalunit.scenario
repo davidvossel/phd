@@ -1,4 +1,5 @@
 # test deployment of iSCSILogicalUnit resource
+# this is rhel6 specific
 
 #################################
 # Scenario Requirements Section #
@@ -13,9 +14,6 @@ cluster_init=1
 ######################
 = SCRIPTS =
 
-##
-# Make the cluster apache and floating ip resources
-##
 target=$PHD_ENV_nodes1
 ....
 
