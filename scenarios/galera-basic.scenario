@@ -28,13 +28,6 @@ target=all
 ....
 # TODO, this assumes there is a network address called eth0. make this dynamic
 
-cat > /etc/sysconfig/clustercheck << EOF
-MYSQL_USERNAME="clustercheck"
-MYSQL_PASSWORD="supersecretpasswd"
-MYSQL_HOST="localhost"
-MYSQL_PORT="3306"
-EOF
-
 cat > /etc/my.cnf.d/galera.cnf << EOF
 [mysqld]
 skip-name-resolve=1
