@@ -18,7 +18,9 @@ clean_shared_storage=1
 = SCRIPTS =
 
 ##
-# Initialize lvm
+# - disable autostarting of nfs-server
+# - make exports directory where all exported
+# filesystems will be mounted.
 ##
 target=all
 ....

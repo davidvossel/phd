@@ -18,7 +18,8 @@ clean_shared_storage=1
 = SCRIPTS =
 
 ##
-# Initialize lvm
+# disable autostarting of nfs-server
+# set floating ip
 ##
 target=all
 ....
