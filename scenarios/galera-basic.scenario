@@ -18,6 +18,11 @@ cluster_init=1
 ##
 target=all
 ....
+# make sure systemd doesn't think it has control over anything
+# systemd is the worst.
+systemctl stop mariadb
+systemctl disable mariadb
+
 rm -rf /var/lib/mysql/*
 ....
 
@@ -26,6 +31,18 @@ rm -rf /var/lib/mysql/*
 ##
 target=all
 ....
+
+# if you are manually looking at these setup steps, do not delete clustercheck.
+# Instead, create a user entry for the 'user' and 'password' defined in the
+# clustercheck file.  Example below.
+# mysql -e "CREATE USER 'clustercheck'@'localhost' IDENTIFIED BY 'supersecretpasswd';"
+#
+# You'll want to create this user before handing the database off to be managed
+# by the cluster. This user will be used by the galera resource agent to monitor
+# the status of each galera instance.  Without defining this user in the local
+# /etc/sysconfig/clustercheck, galera will either use 'root' or whatever user
+# is passed to the scripts 'check_user' parameters to monitor db status.
+rm -f /etc/sysconfig/clustercheck
 
 cat > /etc/my.cnf.d/galera.cnf << EOF
 [mysqld]
