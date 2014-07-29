@@ -1,0 +1,291 @@
+##
+# ganesha exporting glusterfs
+##
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=3
+shared_storage=2
+floating_ips=1
+
+packages=pacemaker corosync pcs nfs-utils resource-agents glusterfs glusterfs-cli glusterfs-server glusterfs-fuse glusterfs-geo-replications nfs-ganesha nfs-ganesha-docs nfs-ganesha-fsal-gluster
+
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# disable autostarting of nfs-server
+##
+target=all
+....
+systemctl disable nfs-server
+systemctl stop nfs-server
+systemctl disable nfs-lock
+systemctl stop nfs-lock
+
+mkdir -p /data/brick1
+....
+
+##
+# Make the cluster storage partitions
+##
+target=$PHD_ENV_nodes1
+....
+
+xfs_create()
+{
+	dev=$1
+	mkfs.xfs -i size=512 $dev
+	if [ $? -ne 0 ]; then
+		echo "Failed to make xfs fs on dev, $dev"
+		exit 1
+	fi
+
+	# make a folder for the gluster volume on each partition
+	mount $dev /data/brick1
+	mkdir /data/brick1/gv0
+	umount /data/brick1
+}
+
+xfs_create "$PHD_ENV_shared_storage1"
+xfs_create "$PHD_ENV_shared_storage2"
+....
+
+##
+# mount filesystems
+##
+target=$PHD_ENV_nodes1
+....
+
+tmpfile=$(mktemp tmpcibXXXXX)
+pcs cluster cib $tmpfile
+
+pcs -f $tmpfile resource create brick-fs1 Filesystem device=${PHD_ENV_shared_storage1} directory=/data/brick1 fstype=xfs
+pcs -f $tmpfile resource create brick-fs2 Filesystem device=${PHD_ENV_shared_storage2} directory=/data/brick1 fstype=xfs
+
+pcs -f $tmpfile constraint location brick-fs1 prefers $PHD_ENV_nodes1
+pcs -f $tmpfile constraint location brick-fs2 prefers $PHD_ENV_nodes2
+
+cibadmin --replace --xml-file $tmpfile
+rm -f $tmpfile
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....
+
+##
+# start gluster
+##
+target=$PHD_ENV_nodes1
+....
+
+tmpfile=$(mktemp tmpcibXXXXX)
+pcs cluster cib $tmpfile
+
+# TODO remove start-delay once we are working with
+# a non-broken pacemaker systemd implementation
+pcs -f $tmpfile resource create gluster-daemon systemd:glusterd op monitor interval=20s start-delay=15s --clone --force
+pcs -f $tmpfile constraint location gluster-daemon-clone avoids $PHD_ENV_nodes3
+
+# Make sure the bricks are mounted before gluster starts
+pcs -f $tmpfile constraint order brick-fs1 then gluster-daemon-clone
+pcs -f $tmpfile constraint order brick-fs2 then gluster-daemon-clone
+
+# never let the two filesystems exist on the same node.
+pcs -f $tmpfile constraint colocation brick-fs1 with brick-fs2 -INFINITY
+
+pcs -f $tmpfile constraint colocation brick-fs1 with gluster-daemon-clone
+pcs -f $tmpfile constraint colocation brick-fs2 with gluster-daemon-clone
+
+cibadmin --replace --xml-file $tmpfile
+rm -f $tmpfile
+
+sleep 15
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+
+exit 0
+....
+
+
+##
+# anti constraints to keep gluster on only the first two nodes
+# Typically you wouldn't want to do this. We're doing this
+# in this setup because we're using the other nodes
+# in the cluster to verify the glusterfs can be exported
+##
+target=$PHD_ENV_nodes1
+....
+
+list=$(echo "$PHD_ENV_nodes" | sed s/${PHD_ENV_nodes1}//g | sed s/${PHD_ENV_nodes2}//g)
+
+pcs constraint location gluster-daemon avoids $list
+pcs constraint location brick-fs1 avoids $list
+pcs constraint location brick-fs2 avoids $list
+....
+
+##
+# do peer probes
+##
+target=$PHD_ENV_nodes1
+....
+gluster peer probe $PHD_ENV_nodes2
+exit 0
+....
+
+##
+# do peer probes
+##
+target=$PHD_ENV_nodes2
+....
+gluster peer probe $PHD_ENV_nodes1
+....
+
+##
+# create and start gluster volume
+##
+target=$PHD_ENV_nodes1
+....
+# re-create gv0 if it already existed
+echo "y" | gluster volume stop gv0 force
+echo "y" | gluster volume delete gv0
+
+gluster volume create gv0 replica 2 ${PHD_ENV_nodes1}:/data/brick1/gv0 ${PHD_ENV_nodes2}:/data/brick1/gv0
+gluster volume start gv0
+
+# disable the kernel nfs export of gv0
+gluster volume set gv0 nfs.disable on
+
+# make sure the gv0 volume is listed
+gluster volume list | grep gv0
+....
+
+
+##
+# set ganesha config on all nodes
+##
+target=all
+....
+
+mkdir -p /etc/ganesha
+
+cat > /etc/ganesha/ganesha.conf << EOF
+FSAL
+{
+	LogLevel = "Red Alert";
+	GLUSTER{
+		FSAL_Shared_Library="/usr/lib64/ganesha/libfsalgluster.so";
+		LogFile = "/var/log/nfs-ganesha.log";
+		max_FS_calls = 0;
+	}
+}
+FileSystem
+{
+	Umask = 0000 ;
+	Link_support = TRUE;
+	Symlink_support = TRUE;
+	CanSetTime = TRUE;
+	xattr_access_rights = 0600;
+}
+CacheInode_Hash
+{
+	Index_Size = 17 ;
+}
+
+CacheInode_Client
+{
+	LogFile = "/var/log/nfs-ganesha.log";
+	Entry_Prealloc_PoolSize = 1000 ;
+	Attr_Expiration_Time = Immediate ;
+	Symlink_Expiration_Time = Immediate ;
+	Directory_Expiration_Time = Immediate ;
+	Use_Test_Access = 1 ;
+}
+CacheInode_GC_Policy
+{
+}
+
+FileContent_Client
+{
+	LRU_Prealloc_PoolSize = 1000 ;
+	LRU_Nb_Call_Gc_invalid = 100 ;
+	Entry_Prealloc_PoolSize = 100 ;
+	Cache_Directory = /tmp/ganesha.datacache ;
+}
+
+FileContent_GC_Policy
+{
+	Lifetime = 60 ;
+	Df_HighWater = 99 ;
+	Df_LowWater = 90 ;
+	Runtime_Interval = 0 ;
+	Nb_Call_Before_GC = 100 ;
+	Emergency_Grace_Delay = 120 ;
+}
+NFS_Worker_Param
+{
+	Nb_Before_GC = 101  ;
+}
+NFS_Core_Param
+{
+	Nb_Worker = 8 ;
+	NFS_Port = 2049 ;
+}
+
+NFS_DupReq_Hash
+{
+	Index_Size = 17 ;
+}
+
+NFS_IP_Name
+{
+	Index_Size = 17 ;
+	Expiration_Time = 3600 ;
+}
+
+EXPORT{
+Export_Id = 90;
+Path="/data/brick1/gv0";
+FSAL {
+name = GLUSTER;
+hostname="$(uname -n)";
+volume="gv0";
+}
+Access_type = RW;
+Allow_root_access = true;
+Pseudo="/gv0";
+NFS_Protocols = "3,4" ;
+Transport_Protocols = "UDP,TCP" ;
+SecType = "sys";
+Tag = "gv0";
+}
+
+EOF
+....
+
+
+##
+# Make the ganesha resource
+##
+target=$PHD_ENV_nodes1
+....
+tmpfile=$(mktemp tmpcibXXXXX)
+pcs cluster cib $tmpfile
+
+pcs -f $tmpfile resource create ganesha-daemon ganesha
+pcs -f $tmpfile constraint order gluster-daemon-clone then ganesha-daemon
+pcs -f $tmpfile constraint colocation add ganesha-daemon with gluster-daemon-clone
+
+cibadmin --replace --xml-file $tmpfile
+rm -f $tmpfile
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....

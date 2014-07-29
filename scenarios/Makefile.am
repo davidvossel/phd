@@ -11,6 +11,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	example.scenario	\
 	gfs2-clvmd.scenario	\
 	galera-basic.scenario	\
+	ganesha-gluster.scenario	\
 	iscsi.scenario	\
 	iscsi-cleanup.scenario	\
 	iscsi-logicalunit.scenario	\
