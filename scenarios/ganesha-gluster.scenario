@@ -270,19 +270,39 @@ Tag = "gv0";
 EOF
 ....
 
-
 ##
-# Make the ganesha resource
+# Make the ganesha resource with floating IP.
 ##
 target=$PHD_ENV_nodes1
 ....
 tmpfile=$(mktemp tmpcibXXXXX)
 pcs cluster cib $tmpfile
 
-pcs -f $tmpfile resource create ganesha-daemon ganesha
-pcs -f $tmpfile constraint order gluster-daemon-clone then ganesha-daemon
-pcs -f $tmpfile constraint colocation add ganesha-daemon with gluster-daemon-clone
+pcs -f $tmpfile resource create nfs-ganesha ganesha
+pcs -f $tmpfile resource create nfs-ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=24
+pcs -f $tmpfile resource group add nfs-group nfs-ganesha nfs-ip
 
+pcs -f $tmpfile constraint order gluster-daemon-clone then nfs-group
+pcs -f $tmpfile constraint colocation add nfs-group with gluster-daemon-clone
+
+cibadmin --replace --xml-file $tmpfile
+rm -f $tmpfile
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....
+
+##
+# test out the ganesha nfs export by mounting the export
+# on a node not running gluster replication
+##
+target=$PHD_ENV_nodes3
+....
+
+tmpfile=$(mktemp tmpcibXXXXX)
+pcs cluster cib $tmpfile
+pcs resource create nfs-client-v4 Filesystem device=$PHD_ENV_floating_ips1:/  directory=/nfsclientv4 fstype=nfs4
+pcs constraint location nfs-client-v4 prefers $PHD_ENV_nodes3
 cibadmin --replace --xml-file $tmpfile
 rm -f $tmpfile
 
