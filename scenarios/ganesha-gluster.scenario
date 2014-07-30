@@ -79,6 +79,8 @@ pcs -f $tmpfile resource create brick-fs2 Filesystem device=${PHD_ENV_shared_sto
 
 pcs -f $tmpfile constraint location brick-fs1 prefers $PHD_ENV_nodes1
 pcs -f $tmpfile constraint location brick-fs2 prefers $PHD_ENV_nodes2
+# never let the two filesystems exist on the same node.
+pcs -f $tmpfile constraint colocation brick-fs1 with brick-fs2 -INFINITY
 
 cibadmin --replace --xml-file $tmpfile
 rm -f $tmpfile
@@ -98,18 +100,28 @@ pcs cluster cib $tmpfile
 
 # TODO remove start-delay once we are working with
 # a non-broken pacemaker systemd implementation
-pcs -f $tmpfile resource create gluster-daemon systemd:glusterd op monitor interval=20s start-delay=15s --clone --force
-pcs -f $tmpfile constraint location gluster-daemon-clone avoids $PHD_ENV_nodes3
+pcs -f $tmpfile resource create gluster-daemon systemd:glusterd op monitor interval=20s start-delay=15s --clone meta interleave=true --force
 
 # Make sure the bricks are mounted before gluster starts
 pcs -f $tmpfile constraint order brick-fs1 then gluster-daemon-clone
 pcs -f $tmpfile constraint order brick-fs2 then gluster-daemon-clone
 
-# never let the two filesystems exist on the same node.
-pcs -f $tmpfile constraint colocation brick-fs1 with brick-fs2 -INFINITY
+# Make sure gluster daemons are placed with the bricks
+pcs -f $tmpfile constraint colocation gluster-daemon-clone with brick-fs1
+pcs -f $tmpfile constraint colocation gluster-daemon-clone with brick-fs2
 
-pcs -f $tmpfile constraint colocation brick-fs1 with gluster-daemon-clone
-pcs -f $tmpfile constraint colocation brick-fs2 with gluster-daemon-clone
+
+##
+# IGNORE THIS for typical setups.
+# anti constraints to keep gluster on only the first two nodes
+# Typically you wouldn't want to do this. We're doing this
+# in this setup because we're using the other nodes
+# in the cluster to verify the glusterfs can be exported
+##
+list=$(echo "$PHD_ENV_nodes" | sed s/${PHD_ENV_nodes1}//g | sed s/${PHD_ENV_nodes2}//g)
+pcs -f $tmpfile constraint location gluster-daemon-clone avoids $list
+pcs -f $tmpfile constraint location brick-fs1 avoids $list
+pcs -f $tmpfile constraint location brick-fs2 avoids $list
 
 cibadmin --replace --xml-file $tmpfile
 rm -f $tmpfile
@@ -119,23 +131,6 @@ sleep 15
 phd_rsc_verify_start_all 90
 
 exit 0
-....
-
-
-##
-# anti constraints to keep gluster on only the first two nodes
-# Typically you wouldn't want to do this. We're doing this
-# in this setup because we're using the other nodes
-# in the cluster to verify the glusterfs can be exported
-##
-target=$PHD_ENV_nodes1
-....
-
-list=$(echo "$PHD_ENV_nodes" | sed s/${PHD_ENV_nodes1}//g | sed s/${PHD_ENV_nodes2}//g)
-
-pcs constraint location gluster-daemon avoids $list
-pcs constraint location brick-fs1 avoids $list
-pcs constraint location brick-fs2 avoids $list
 ....
 
 ##
@@ -308,8 +303,11 @@ target=$PHD_ENV_nodes3
 
 tmpfile=$(mktemp tmpcibXXXXX)
 pcs cluster cib $tmpfile
-pcs resource create nfs-client-v4 Filesystem device=$PHD_ENV_floating_ips1:/  directory=/nfsclientv4 fstype=nfs4
-pcs constraint location nfs-client-v4 prefers $PHD_ENV_nodes3
+pcs -f $tmpfile resource create nfs-client-v4 Filesystem device=$PHD_ENV_floating_ips1:/  directory=/nfsclientv4 fstype=nfs4
+
+# we know node3 isn't used for the gluster storage cluster because of
+# the anti-colocation rules we setup for this test environment.
+pcs -f $tmpfile constraint location nfs-client-v4 prefers $PHD_ENV_nodes3
 cibadmin --replace --xml-file $tmpfile
 rm -f $tmpfile
 
