@@ -1,0 +1,67 @@
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+fence_cmd=1
+
+packages=pacemaker corosync pcs resource-agents wget
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# TODO This is currently hardcoded to eth0
+# make the interface a variable.
+##
+target=$PHD_ENV_nodes1
+....
+
+#rm -f /usr/lib/ocf/resource.d/heartbeat/ethmonitor
+#wget https://raw.githubusercontent.com/davidvossel/resource-agents/ethmonitor-fixes/heartbeat/ethmonitor
+#chmod 755 ethmonitor
+#mv ethmonitor /usr/lib/ocf/resource.d/heartbeat/ethmonitor
+
+# The ethmonitor resource works by setting a node attribute variable
+# that indicates whether or not the ethernet device is operational.
+#
+# By default this attribute is named ethmonitor-'interface'. So if your
+# interface is eth0 like in this example script, the attribute will
+# be 'ethmonitor-eth0'.
+#
+# When you want to build constraints around whether or not an ethernet
+# device is available, use a location constraint with a rule expression
+# that checks to see if the ethmonitor attribute is set correctly.
+#
+
+# Create ethmonitor resources
+pcs resource create ethmon ethmonitor interface=eth0 op monitor timeout=60s interval=30s --clone
+
+# Create a fake resource for testing that will be dependent on eth0.
+pcs resource create FAKE Dummy
+
+# Only allow the FAKE resource to run on a node the ethmonitor
+# resource tells us the ethernet device is up on.
+pcs constraint location FAKE rule score=-INFINITY ethmonitor-eth0 ne 1
+
+# To test if the constraint is working, Run this on the node
+# the FAKE resource is currently on
+#
+# attrd_updater -D -n ethmonitor-eth0
+#
+# or
+#
+# attrd_updater -n ethmonitor-eth0 -v 0 -q
+#
+# Both of those commands should trigger a temporary failover
+# of the FAKE resource. The FAKE resource will move back when
+# the ethmonitor resource resets ethmonitor-eth0 in the next
+# monitor interval though.
+
+phd_rsc_verify_start_all 120
+....
+
