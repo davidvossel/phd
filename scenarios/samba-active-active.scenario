@@ -50,15 +50,21 @@ guest ok = yes
 read only = no
 END
 
-rm -f /etc/ctdb/nodes
-for node in $(echo $nodes); do
-	ip=$(phd_cmd_exec "ip addr | grep 'inet ' | tail -n 1" "$node")
-	ip=$(echo "$ip" | awk '{print $2}' | sed 's/\/.*//g' | sed 's/inet //g')
-	echo "$ip" >> /etc/ctdb/nodes
-done
+#rm -f /etc/ctdb/nodes
+#for node in $(echo $nodes); do
+#	ip=$(phd_cmd_exec "ip addr | grep 'inet ' | tail -n 1" "$node")
+#	ip=$(echo "$ip" | awk '{print $2}' | sed 's/\/.*//g' | sed 's/inet //g')
+#	echo "$ip" >> /etc/ctdb/nodes
+#done
 
 groupadd -g 581 smbguest
 adduser smbguest -g smbguest
+
+# TODO remove this once CTDB is supported in rhel
+rm -f /usr/lib/ocf/resource.d/heartbeat/CTDB
+wget https://raw.githubusercontent.com/ClusterLabs/resource-agents/master/heartbeat/CTDB
+chmod 755 CTDB
+mv CTDB /usr/lib/ocf/resource.d/heartbeat/CTDB 
 
 exit 0
 ....
