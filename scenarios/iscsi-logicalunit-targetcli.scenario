@@ -1,0 +1,51 @@
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs resource-agents targetcli iscsi-initiator-utils
+cluster_init=1
+shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# 1. setup the iscsi dev from a shared memory device
+##
+target=$PHD_ENV_nodes1
+....
+
+scsi_name="phdtest"
+
+#cleanup any previous iqn target
+iqn=$(targetcli ls /iscsi  | grep iqn.*TPGs | awk '{ print $2 }')
+echo "Processing $iqn target"
+if [ -n "$iqn" ]; then
+	targetcli /iscsi/${iqn}/tpg1/luns delete 0
+	targetcli /iscsi delete $iqn
+fi
+
+targetcli /backstores/block create name=${scsi_name} dev=${PHD_ENV_shared_storage1}  write_back=FALSE
+
+targetcli /iscsi create
+iqn=$(targetcli ls /iscsi  | grep iqn | awk '{ print $2 }')
+if [ $? -ne 0 ]; then
+	echo "Failed to create iscsi from fileio dev $storage_file"
+	return 1
+fi
+
+tmpfile=mktemp
+pcs cluster cib $tmpfile
+pcs -f $tmpfile resource create $scsi_name iSCSILogicalUnit target_iqn=${iqn} path=${PHD_ENV_shared_storage1} lun=0
+pcs -f $tmpfile constraint location $scsi_name prefers $PHD_ENV_nodes1
+pcs cluster cib-push $tmpfile
+rm -f $tmpfile
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
