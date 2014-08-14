@@ -25,16 +25,15 @@ phd_rsc_verify_start_all 90
 
 # cleanup previous run
 tgtadm --lld iscsi --op delete --mode target --tid 1
-rm -rf /luns
+rm -f /tmp/lun1
 
 # create iqn
-tgtadm --lld iscsi --op new --mode target --tid 1 -T iqn.2001-04.com.example:storage.disk2.amiens.sys1.xyz
+tgtadm --lld iscsi --op new --mode target --tid 1 -T $iqn
 tgtadm --lld iscsi --op show --mode target
 
-mkdir /luns
-fallocate -l 64M /luns/lun1
+fallocate -l 512 /tmp/lun1
 
-pcs resource create lun1 iSCSILogicalUnit lun=1 target_iqn=${iqn} path=/luns/lun1 --group iscsi-targets
+pcs resource create lun1 iSCSILogicalUnit lun=1 target_iqn=${iqn} path=/tmp/lun1 --group iscsi-targets
 phd_rsc_verify_start_all 90
 ....
 
