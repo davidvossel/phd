@@ -13,6 +13,7 @@ image=""
 run_cts=0
 pcmklogs="/var/log/pacemaker.log"
 doc_opts=""
+debug_container=0
 
 function helptext() {
 	echo "pcmk_docker_autogen.sh - A tool for generating pacemaker clusters locally with docker containers."
@@ -22,6 +23,7 @@ function helptext() {
 	echo "Options:"
 	echo "-c, --containers    Specify the number of containers to generate, defaults to $containers."
 	echo "-d, --cleanup-only  Cleanup previous containers only."
+	echo "-D, --debug-mode    Launch a container in interactive mode for testing."
 	echo "-f, --from          Specify the FROM image to base the docker containers off of. Default is \"$from\""
 	echo "-o, --doc-opts      Connection options to pass to docker daemon for every command"
 	echo "-p, --pull          Force pull \"from\" image regardless if it exists or not."
@@ -80,7 +82,7 @@ make_image()
 	cp $ssh_keys/authorized_keys ssh_keys/
 	cat << END >> Dockerfile
 FROM $from
-RUN yum install -y net-tools openssh-server pacemaker resource-agents pcs corosync
+RUN yum install -y net-tools openssh-server pacemaker resource-agents pcs corosync which
 ADD /ssh_keys /root/.ssh/
 ADD /launch_scripts /root/
 ENTRYPOINT /root/launch.sh
@@ -146,8 +148,14 @@ launch_containers()
 $ip     $name
 END
 		echo "Launching node $name"
-		echo "docker $doc_opts run -d -e "DOCK_NODES=$node_ips" -e DOCK_IP=$ip -e DOCK_GATEWAY=$gateway -h $name --name=$name $image"
-		docker $doc_opts run -d -e "DOCK_NODES=$node_ips" -e DOCK_IP=$ip -e DOCK_GATEWAY=$gateway -h $name --name=$name $image
+
+		if [ $debug_container -eq 0 ]; then
+			echo "docker $doc_opts run -d -e "DOCK_NODES=$node_ips" -e DOCK_IP=$ip -e DOCK_GATEWAY=$gateway -h $name --name=$name $image"
+			docker $doc_opts run -d -e "DOCK_NODES=$node_ips" -e DOCK_IP=$ip -e DOCK_GATEWAY=$gateway -h $name --name=$name $image
+		else
+			docker $doc_opts run -i -t -e "DOCK_NODES=$node_ips" -e DOCK_IP=$ip -e DOCK_GATEWAY=$gateway -h $name --name=$name --entrypoint=/bin/bash $image
+		fi
+
 	done
 }
 
@@ -173,6 +181,7 @@ while true ; do
 	--help|-h|-\?) helptext 0;;
 	-c|--containers) containers="$2"; shift; shift;;
 	-d|--cleanup-only) prev_cluster_cleanup; exit 0;;
+	-D|--debug-mode) debug_container=1; shift;;
 	-f|--from) from="$2"; shift; shift;;
 	-o|--doc-opts) doc_opts=$2; shift; shift;;
 	-p|--pull) pull=1; shift;;
