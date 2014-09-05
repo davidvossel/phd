@@ -1,5 +1,6 @@
 #!/bin/bash
 
+node_ips=""
 containers="2"
 from="fedora"
 #from="fedora"
@@ -34,6 +35,52 @@ function helptext() {
 	exit $1
 }
 
+
+SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o BatchMode=yes"
+ssh_cmd_bg()
+{
+	local cmd=$1
+	local node=$2
+	local fullcmd="ssh $SSH_OPTS -l root $node $cmd"
+
+	timeout -s KILL 300 $fullcmd &
+}
+
+ssh_cmd()
+{
+	local cmd=$1
+	local node=$2
+	local fullcmd="ssh $SSH_OPTS -l root $node $cmd"
+
+	timeout -s KILL 300 $fullcmd
+}
+
+verify_connection()
+{
+	local nodes=$1
+
+	for node in $(echo $nodes); do
+		ssh_cmd "ls > /dev/null 2>&1" "$node"
+		if [ $? -ne 0 ]; then
+			echo "Unable to establish connection with node \"$node\"."
+			exit 1
+		fi
+		echo "Node ($node) is accessible"
+	done
+}
+
+rm_from_file()
+{
+	local tmpfile=$(mktemp)
+
+	rm -f ${1}_bu
+	cp $1 ${1}_bu
+
+	cat $1 | grep -v $2 > $tmpfile
+	cat $tmpfile > $1
+	rm -f $tmpfile
+}
+
 docker_setup()
 {
 	# make sure we have docker installed
@@ -59,7 +106,6 @@ prev_cluster_cleanup()
 	docker $doc_opts rm $(docker $doc_opts ps -a | grep docker | awk '{print $1}') > /dev/null 2>&1
 	if [ $reuse -eq 0 ]; then
 		docker $doc_opts rmi $prev_image > /dev/null 2>&1
-		sed -i.bak '/docker.*/d' $ssh_keys/known_hosts
 	fi
 }
 
@@ -94,24 +140,11 @@ END
 	mkdir launch_scripts
 	cat << END >> launch_scripts/launch.sh
 #!/bin/bash
-mkdir -p /var/lock/subsys/
-ifconfig eth0 \$DOCK_IP
-route add 0.0.0.0 gw \$DOCK_GATEWAY eth0
-ifconfig
 if [ ! -e /etc/ssh_host_ecdsa_key ]; then
 	sshd-keygen
 fi
 
-/sbin/sshd
-echo "sshd exit code: $?"
-pcs cluster setup --local mycluster \$(echo \$DOCK_NODES | tr '_' ' ')
-/usr/share/corosync/corosync start
-if [ $? -ne 0 ]; then
-	echo "corosync failed to launch!"
-fi
-
-export PCMK_debugfile=$pcmklogs
-pacemakerd
+/sbin/sshd -D
 END
 	chmod 755 launch_scripts/launch.sh
 
@@ -126,37 +159,55 @@ END
 
 launch_containers()
 {
-	echo "Launcing containers"
+	echo "Launching containers"
 
-	for (( c=1; c <= $containers; c++ ))
-	do
-		if [ -z $node_ips ]; then
-			node_ips="${iprange}${c}"
-		else
-			node_ips="${node_ips}_${iprange}${c}"
-		fi
-	done
 
 	for (( c=1; c <= $containers; c++ ))
 	do
 		name="docker${c}"
-		ip="${iprange}${c}"
-
-		sed -i.bak "/...\....\....\..* ${name}/d" /etc/hosts
-
-		cat << END >> /etc/hosts
-$ip     $name
-END
 		echo "Launching node $name"
 
 		if [ $debug_container -eq 0 ]; then
-			echo "docker $doc_opts run -d -e "DOCK_NODES=$node_ips" -e DOCK_IP=$ip -e DOCK_GATEWAY=$gateway -h $name --name=$name $image"
-			docker $doc_opts run -d -e "DOCK_NODES=$node_ips" -e DOCK_IP=$ip -e DOCK_GATEWAY=$gateway -h $name --name=$name $image
+			docker $doc_opts run -d -h $name --name=$name $image
 		else
-			docker $doc_opts run -i -t -e "DOCK_NODES=$node_ips" -e DOCK_IP=$ip -e DOCK_GATEWAY=$gateway -h $name --name=$name --entrypoint=/bin/bash $image
+			docker $doc_opts run -i -t -h $name --name=$name --entrypoint=/bin/bash $image
+			exit 0
 		fi
 
+		ip="$(docker inspect $name | grep IPAddress | awk '{print $2}' | sed s/\"//g | sed s/,//g)"
+
+		rm_from_file "/etc/hosts" "$name"
+		cat << END >> /etc/hosts
+$ip     $name
+END
+
+		if [ -z "$node_ips" ]; then
+			node_ips="$ip"
+		else
+			node_ips="${node_ips} ${ip}"
+		fi
+
+		rm_from_file "$HOME/.ssh/known_hosts" "$name"
+		rm_from_file "$HOME/.ssh/known_hosts" "$ip"
 	done
+}
+
+launch_pcmk()
+{
+
+	echo "Starting pacemaker on IP list: $node_ips"
+
+	for (( c=1; c <= $containers; c++ ))
+	do
+		name="docker${c}"
+
+		verify_connection "$name" 
+		ssh_cmd "pcs cluster setup --local mycluster $node_ips"  "$name"
+		ssh_cmd "/usr/share/corosync/corosync start" "$name" > /dev/null 2>&1
+		ssh_cmd_bg "export PCMK_debugfile=$pcmklogs && pacemakerd" "$name" > /dev/null 2>&1
+	done
+
+	echo "DONE"
 }
 
 launch_cts()
@@ -198,4 +249,5 @@ docker_setup
 prev_cluster_cleanup
 make_image
 launch_containers
+launch_pcmk
 launch_cts
