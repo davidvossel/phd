@@ -19,6 +19,12 @@ shared_storage=1
 target=$PHD_ENV_nodes1
 ....
 
+
+wget https://raw.githubusercontent.com/davidvossel/resource-agents/iscsi-updates/heartbeat/iSCSILogicalUnit
+chmod 755 iSCSILogicalUnit
+rm -f /usr/lib/ocf/resource.d/heartbeat/iSCSILogicalUnit
+cp iSCSILogicalUnit /usr/lib/ocf/resource.d/heartbeat/iSCSILogicalUnit
+
 scsi_name="phdtest"
 
 #cleanup any previous iqn target

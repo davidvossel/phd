@@ -7,7 +7,6 @@ from="fedora"
 pull=0
 iprange="172.17.0."
 gateway="172.17.42.1"
-ssh_keys="$HOME/.ssh/"
 reuse=0
 prev_image=""
 image=""
@@ -29,30 +28,14 @@ function helptext() {
 	echo "-o, --doc-opts      Connection options to pass to docker daemon for every command"
 	echo "-p, --pull          Force pull \"from\" image regardless if it exists or not."
 	echo "-r, --reuse-image   Reuse image built from previous cluster if previous image is detected."
-	echo "-s, --ssh-keys      Specify ssh directory to copy keys over from. Defaults to \"$ssh_keys\""
 	echo "-t, --cts-test      Run cts on docker instances"
 	echo ""
 	exit $1
 }
 
-
-SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=30 -o BatchMode=yes"
-ssh_cmd_bg()
+exec_cmd()
 {
-	local cmd=$1
-	local node=$2
-	local fullcmd="ssh $SSH_OPTS -l root $node $cmd"
-
-	timeout -s KILL 300 $fullcmd &
-}
-
-ssh_cmd()
-{
-	local cmd=$1
-	local node=$2
-	local fullcmd="ssh $SSH_OPTS -l root $node $cmd"
-
-	timeout -s KILL 300 $fullcmd
+	echo "$1" | nsenter --target $(docker inspect --format {{.State.Pid}} ${2}) --mount --uts --ipc --net --pid
 }
 
 verify_connection()
@@ -60,7 +43,7 @@ verify_connection()
 	local nodes=$1
 
 	for node in $(echo $nodes); do
-		ssh_cmd "ls > /dev/null 2>&1" "$node"
+		exec_cmd "ls > /dev/null 2>&1" "$node"
 		if [ $? -ne 0 ]; then
 			echo "Unable to establish connection with node \"$node\"."
 			exit 1
@@ -86,8 +69,9 @@ docker_setup()
 	# make sure we have docker installed
 	yum list installed | grep "docker-io" > /dev/null 2>&1
 	if [ $? -ne 0 ]; then
-		yum install docker-io
+		yum install docker-io docker
 	fi
+	systemctl start docker
 	# handle base image retrieval
 	docker $doc_opts images | grep -q "$from"
 	if [ $? -ne 0 ]; then
@@ -121,15 +105,18 @@ make_image()
 	fi
 
 	echo "Making Dockerfile"
+
+	# this gets around a bug in rhel 7.0
+	touch /etc/yum.repos.d/redhat.repo
+
 	rm -f Dockerfile
-	rm -rf ssh_keys
-	mkdir ssh_keys
-	cp $ssh_keys/id* ssh_keys/
-	cp $ssh_keys/authorized_keys ssh_keys/
+	rm -rf repos
+	mkdir repos
+	cp /etc/yum.repos.d/* repos/
 	cat << END >> Dockerfile
 FROM $from
-RUN yum install -y net-tools openssh-server pacemaker resource-agents pcs corosync which
-ADD /ssh_keys /root/.ssh/
+ADD /repos /etc/yum.repos.d/
+RUN yum install -y net-tools pacemaker resource-agents pcs corosync which
 ADD /launch_scripts /root/
 ENTRYPOINT /root/launch.sh
 END
@@ -140,11 +127,7 @@ END
 	mkdir launch_scripts
 	cat << END >> launch_scripts/launch.sh
 #!/bin/bash
-if [ ! -e /etc/ssh_host_ecdsa_key ]; then
-	sshd-keygen
-fi
-
-/sbin/sshd -D
+sleep 10000000
 END
 	chmod 755 launch_scripts/launch.sh
 
@@ -168,18 +151,13 @@ launch_containers()
 		echo "Launching node $name"
 
 		if [ $debug_container -eq 0 ]; then
-			docker $doc_opts run -d -h $name --name=$name $image
+			docker $doc_opts run -d -P -h $name --name=$name $image /bin/bash
 		else
-			docker $doc_opts run -i -t -h $name --name=$name --entrypoint=/bin/bash $image
+			docker $doc_opts run -i -t -P -h $name --name=$name $image /bin/bash
 			exit 0
 		fi
 
 		ip="$(docker inspect $name | grep IPAddress | awk '{print $2}' | sed s/\"//g | sed s/,//g)"
-
-		rm_from_file "/etc/hosts" "$name"
-		cat << END >> /etc/hosts
-$ip     $name
-END
 
 		if [ -z "$node_ips" ]; then
 			node_ips="$ip"
@@ -187,8 +165,6 @@ END
 			node_ips="${node_ips} ${ip}"
 		fi
 
-		rm_from_file "$HOME/.ssh/known_hosts" "$name"
-		rm_from_file "$HOME/.ssh/known_hosts" "$ip"
 	done
 }
 
@@ -202,9 +178,9 @@ launch_pcmk()
 		name="docker${c}"
 
 		verify_connection "$name" 
-		ssh_cmd "pcs cluster setup --local mycluster $node_ips"  "$name"
-		ssh_cmd "/usr/share/corosync/corosync start" "$name" > /dev/null 2>&1
-		ssh_cmd_bg "export PCMK_debugfile=$pcmklogs && pacemakerd" "$name" > /dev/null 2>&1
+		exec_cmd "pcs cluster setup --local --name mycluster $node_ips"  "$name"
+		exec_cmd "/usr/share/corosync/corosync start" "$name" > /dev/null 2>&1
+		exec_cmd "export PCMK_debugfile=$pcmklogs && pacemakerd &" "$name" > /dev/null 2>&1
 	done
 
 	echo "DONE"
@@ -237,7 +213,6 @@ while true ; do
 	-o|--doc-opts) doc_opts=$2; shift; shift;;
 	-p|--pull) pull=1; shift;;
 	-r|--reuse) reuse=1; shift;;
-	-s|--ssh-keys) ssh_keys=$2; shift; shift;;
 	-t|--cts-test) run_cts=1; shift;;
 	"") break;;
 	*) helptext 1;;
