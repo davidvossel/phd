@@ -89,8 +89,9 @@ make_image()
 	cat << END >> Dockerfile
 FROM $from
 ADD /repos /etc/yum.repos.d/
-RUN yum install -y net-tools pacemaker resource-agents pcs corosync which
+RUN yum install -y net-tools pacemaker resource-agents pcs corosync which fence-agents-common
 ADD /launch_scripts /root/
+ADD /misc/fence_docker_cts /usr/sbin/
 ENTRYPOINT /root/launch.sh
 END
 

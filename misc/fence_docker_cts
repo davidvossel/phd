@@ -87,7 +87,6 @@ function docker_log() {
 if [ -z $1 ]; then
 	# If there are no command line args, look for options from stdin
 	while read line; do
-	echo "cur line is $line"
 	case $line in 
 		option=*|action=*) action=`echo $line | sed s/.*=//`;;
 		port=*)			port=`echo $line | sed s/.*=//`;;
@@ -191,7 +190,7 @@ case $action in
 			fence_done 2
 		fi
 		;;
-	stop|start|reboot) : ;;
+	monitor|stop|start|reboot) : ;;
 	*) docker_log "Unknown action: $action"; fence_done 1;;
 esac
 

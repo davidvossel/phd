@@ -35,11 +35,13 @@ function respond()
 	echo "Sending Response to source node: $node"
 	echo "Return String: $string"
 	if [ "$us" = "$node" ]; then
-		echo "$string" > $returnfile
-	else 
-		echo "echo $string > $returnfile" | nsenter --target $(docker inspect --format {{.State.Pid}} ${node}) --mount --uts --ipc --net --pid
+		write_file=$returnfile
+	else
+		write_file="/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/$returnfile"
 	fi
 
+	echo "Return File: $write_file"
+	echo "$string" > $write_file
 	kill -9 $pid
 }
 
@@ -74,7 +76,12 @@ while [ 1 -eq 1 ]; do
 
 		;;
 
-	status)
+	status|monitor)
+
+		if [ -z "$node" ]; then
+			respond "success" "$returnfile" "$srcnode" "$pid"
+			continue;
+		fi
 		res=$(docker inspect --format {{.State.Running}} $node)
 		if [ $? -eq 0 ]; then
 			respond "$res" "$returnfile" "$srcnode" "$pid"
