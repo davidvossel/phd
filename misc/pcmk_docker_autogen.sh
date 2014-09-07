@@ -178,7 +178,10 @@ launch_pcmk()
 		name="docker${c}"
 
 		verify_connection "$name" 
-		exec_cmd "pcs cluster setup --local --name mycluster $node_ips"  "$name"
+		exec_cmd "pcs cluster setup --local --name mycluster $node_ips"  "$name" > /dev/null 2>&1
+		if [ "$?" -ne 0 ]; then
+			exec_cmd "pcs cluster setup --local mycluster $node_ips"  "$name" > /dev/null 2>&1
+		fi
 		exec_cmd "/usr/share/corosync/corosync start" "$name" > /dev/null 2>&1
 		exec_cmd "export PCMK_debugfile=$pcmklogs && pacemakerd &" "$name" > /dev/null 2>&1
 	done
