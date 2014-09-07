@@ -89,7 +89,7 @@ make_image()
 	cat << END >> Dockerfile
 FROM $from
 ADD /repos /etc/yum.repos.d/
-RUN yum install -y net-tools pacemaker resource-agents pcs corosync which fence-agents-common
+RUN yum install -y net-tools pacemaker resource-agents pcs corosync which fence-agents-common sysvinit-tools
 ADD /launch_scripts /root/
 ADD /misc/fence_docker_cts /usr/sbin/
 ENTRYPOINT /root/launch.sh
@@ -112,6 +112,96 @@ END
 		echo "ERROR: failed to generate docker image"
 	fi
 	image=$(docker $doc_opts images -q | head -n 1)
+}
+
+write_helper_scripts()
+{
+	local index=$1
+	local name="docker${index}"
+	local tmp=$(mktemp)
+
+	cat << END >> $tmp
+#!/bin/bash
+
+export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=${pcmkiprange}$index OCF_RESKEY_cidr_netmask=32
+/usr/lib/ocf/resource.d/heartbeat/IPaddr2 start
+
+/usr/share/corosync/corosync start > /dev/null 2>&1
+
+pid=\$(pidof pacemakerd)
+if [ -z "\$pid" ];  then
+	export PCMK_debugfile=$pcmklogs
+	pacemakerd & > /dev/null 2>&1
+fi
+END
+	chmod 755 $tmp
+	cp $tmp "/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/usr/sbin/pcmk_start"
+
+
+	cat << END >> $tmp
+#!/bin/bash
+status()
+{
+	pid=\$(pidof \$1 2>/dev/null)
+	rtrn=\$?
+	if [ \$rtrn -ne 0 ]; then
+		echo "\$1 is stopped"
+	else
+		echo "\$1 (pid \$pid) is running..."
+	fi
+	return \$rtrn
+}
+stop()
+{
+	desc="Pacemaker Cluster Manager"
+	prog=\$1
+	shutdown_prog=\$prog
+
+	if ! status \$prog > /dev/null 2>&1; then
+	    shutdown_prog="crmd"
+	fi
+
+	if status \$shutdown_prog > /dev/null 2>&1; then
+	    kill -TERM \$(pidof \$prog) > /dev/null 2>&1
+
+	    while status \$prog > /dev/null 2>&1; do
+		sleep 1
+		echo -n "."
+	    done
+	else
+	    echo -n "\$desc is already stopped"
+	fi
+
+	rm -f /var/lock/subsystem/\$prog
+	rm -f /var/run/\${prog}.pid
+	killall -q -9 'crmd stonithd attrd cib lrmd pacemakerd corosync pacemaker_remoted'
+}
+
+stop "pacemakerd"
+/usr/share/corosync/corosync stop > /dev/null 2>&1
+exit 0
+END
+	chmod 755 $tmp
+	cp $tmp "/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/usr/sbin/pcmk_stop"
+
+	rm -f $tmp
+}
+
+launch_pcmk()
+{
+	local index=$1
+	local name="docker${index}"
+
+	verify_connection "$name"
+	exec_cmd "pcmk_start" "$name"
+}
+
+launch_pcmk_all()
+{
+	for (( c=1; c <= $containers; c++ ))
+	do
+		launch_pcmk $c
+	done
 }
 
 launch_containers()
@@ -152,27 +242,9 @@ launch_containers()
 		if [ "$?" -ne 0 ]; then
 			exec_cmd "pcs cluster setup --local mycluster $node_ips"  "$name" > /dev/null 2>&1
 		fi
+		write_helper_scripts $c
 	done
 
-}
-
-launch_pcmk()
-{
-	local index=$1
-	local name="docker${index}"
-
-	verify_connection "$name"
-	exec_cmd "export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=${pcmkiprange}$index OCF_RESKEY_cidr_netmask=32 && /usr/lib/ocf/resource.d/heartbeat/IPaddr2 start" "$name"
-	exec_cmd "/usr/share/corosync/corosync start" "$name" > /dev/null 2>&1
-	exec_cmd "export PCMK_debugfile=$pcmklogs && pacemakerd &" "$name" > /dev/null 2>&1
-}
-
-launch_pcmk_all()
-{
-	for (( c=1; c <= $containers; c++ ))
-	do
-		launch_pcmk $c
-	done
 }
 
 launch_cts()
