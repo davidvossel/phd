@@ -6,6 +6,7 @@ from="fedora"
 #from="fedora"
 pull=0
 iprange="172.17.0."
+pcmkiprange="172.17.200."
 gateway="172.17.42.1"
 reuse=0
 prev_image=""
@@ -157,7 +158,7 @@ launch_containers()
 			exit 0
 		fi
 
-		ip="$(docker inspect $name | grep IPAddress | awk '{print $2}' | sed s/\"//g | sed s/,//g)"
+		ip="${pcmkiprange}$c"
 
 		if [ -z "$node_ips" ]; then
 			node_ips="$ip"
@@ -166,27 +167,38 @@ launch_containers()
 		fi
 
 	done
-}
-
-launch_pcmk()
-{
-
-	echo "Starting pacemaker on IP list: $node_ips"
 
 	for (( c=1; c <= $containers; c++ ))
 	do
 		name="docker${c}"
 
-		verify_connection "$name" 
+		verify_connection "$name"
+		echo "setting up cluster"
 		exec_cmd "pcs cluster setup --local --name mycluster $node_ips"  "$name" > /dev/null 2>&1
 		if [ "$?" -ne 0 ]; then
 			exec_cmd "pcs cluster setup --local mycluster $node_ips"  "$name" > /dev/null 2>&1
 		fi
-		exec_cmd "/usr/share/corosync/corosync start" "$name" > /dev/null 2>&1
-		exec_cmd "export PCMK_debugfile=$pcmklogs && pacemakerd &" "$name" > /dev/null 2>&1
 	done
 
-	echo "DONE"
+}
+
+launch_pcmk()
+{
+	local index=$1
+	local name="docker${index}"
+
+	verify_connection "$name"
+	exec_cmd "export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=${pcmkiprange}$index OCF_RESKEY_cidr_netmask=32 && /usr/lib/ocf/resource.d/heartbeat/IPaddr2 start" "$name"
+	exec_cmd "/usr/share/corosync/corosync start" "$name" > /dev/null 2>&1
+	exec_cmd "export PCMK_debugfile=$pcmklogs && pacemakerd &" "$name" > /dev/null 2>&1
+}
+
+launch_pcmk_all()
+{
+	for (( c=1; c <= $containers; c++ ))
+	do
+		launch_pcmk $c
+	done
 }
 
 launch_cts()
@@ -227,5 +239,7 @@ docker_setup
 prev_cluster_cleanup
 make_image
 launch_containers
-launch_pcmk
+launch_pcmk_all
 launch_cts
+
+echo "DONE"
