@@ -16,7 +16,7 @@ if [ -z "$node" ]; then
 fi
 
 
-if [ "$us" = "$node" ]; then
+if [ "$us" = "$node" ] || [ "localhost" = "$node" ]; then
 	cp $1 $target_file
 else
 	cp $1 "/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/$target_file"
