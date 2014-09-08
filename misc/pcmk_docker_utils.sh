@@ -82,13 +82,22 @@ make_image()
 	# this gets around a bug in rhel 7.0
 	touch /etc/yum.repos.d/redhat.repo
 
-	rm -f Dockerfile
+	rm -rf rpms
+	mkdir rpms
+	if [ -n "$rpmdir" ]; then
+		cp $rpmdir/* rpms/
+	fi
+
 	rm -rf repos
 	mkdir repos
 	cp /etc/yum.repos.d/* repos/
+
+	rm -f Dockerfile
 	cat << END >> Dockerfile
 FROM $from
 ADD /repos /etc/yum.repos.d/
+ADD /rpms /root/
+RUN yum install -y /root/*.rpm
 RUN yum install -y net-tools pacemaker resource-agents pcs corosync which fence-agents-common sysvinit-tools
 ADD /launch_scripts /root/
 ADD /misc/fence_docker_cts /usr/sbin/

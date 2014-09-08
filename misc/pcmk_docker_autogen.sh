@@ -11,6 +11,7 @@ image=""
 run_cts=0
 doc_opts=""
 debug_container=0
+rpmdir=""
 
 function helptext() {
 	echo "pcmk_docker_autogen.sh - A tool for generating pacemaker clusters locally with docker containers."
@@ -25,6 +26,7 @@ function helptext() {
 	echo "-o, --doc-opts      Connection options to pass to docker daemon for every command"
 	echo "-p, --pull          Force pull \"from\" image regardless if it exists or not."
 	echo "-r, --reuse-image   Reuse image built from previous cluster if previous image is detected."
+	echo "-R, --rpm-copu      Copy rpms in this directory to image for install".
 	echo "-t, --cts-test      Run cts on docker instances"
 	echo ""
 	exit $1
@@ -40,6 +42,7 @@ while true ; do
 	-o|--doc-opts) doc_opts=$2; shift; shift;;
 	-p|--pull) pull=1; shift;;
 	-r|--reuse) reuse=1; shift;;
+	-R|--rpm-copy) rpmdir=$2; shift; shift;;
 	-t|--cts-test) run_cts=1; shift;;
 	"") break;;
 	*) helptext 1;;
