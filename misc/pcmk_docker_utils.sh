@@ -251,6 +251,9 @@ launch_containers()
 		if [ "$?" -ne 0 ]; then
 			exec_cmd "pcs cluster setup --local mycluster $node_ips"  "$name" > /dev/null 2>&1
 		fi
+		# make sure we use file based logging 
+		exec_cmd 'cat /etc/corosync/corosync.conf | sed "s/to_syslog:.*yes/to_logfile: yes\\nlogfile: \\/var\\/log\\/pacemaker.log/g" > /etc/corosync/corosync.conf.bu' "$name"
+		exec_cmd "mv -f /etc/corosync/corosync.conf.bu /etc/corosync/corosync.conf" "$name"
 		write_helper_scripts $c
 	done
 
