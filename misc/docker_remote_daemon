@@ -55,7 +55,7 @@ while [ 1 -eq 1 ]; do
 	echo "$line"
 	echo "PROCESSING REQUEST: on $srcnode run $prog $args"
 
-	echo "$prog $args" | nsenter -F --target $(docker inspect --format {{.State.Pid}} ${srcnode}) --mount --uts --ipc --net --pid > $stdoutfile 2> $stderrfile
+	echo "$prog $args" | nsenter --target $(docker inspect --format {{.State.Pid}} ${srcnode}) --mount --uts --ipc --net --pid > $stdoutfile 2> $stderrfile
 	rc=$?
 	echo "$rc" > $rcfile
 	echo "DONE exit code = $rc"
