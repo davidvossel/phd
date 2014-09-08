@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# Copyright (c) 2014 David Vossel <dvossel@redhat.com>
+#					All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of version 2 of the GNU General Public License as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it would be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# Further, this software is distributed without any warranty that it is
+# free of the rightful claim of any third person regarding infringement
+# or the like.  Any license provided herein, whether implied or
+# otherwise, applies only to this software file.  Patent licenses, if
+# any, provided herein do not apply to combinations of this program with
+# other software, or any other product whatsoever.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write the Free Software Foundation,
+# Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
+#
+#######################################################################
+
+
+while [ 1 -eq 1 ]; do
+	usleep 100000
+
+	job=$(ls /var/run/docker_remote* 2>/dev/null | grep -m 1 docker_remote_daemon_JOB*)
+	if [ -z "$job" ]; then
+		continue;
+	fi
+
+	pid=$(cat $job)
+	if [ -z "$pid" ]; then
+		rm -f $job
+		continue;
+	fi
+
+	line="$(ps -aux | grep [d]ocker_remote_cmd | grep $pid)"
+	if [ -z "$line" ]; then
+		rm -f $job
+		continue;
+	fi
+
+	echo "\n== NEW JOB ===="
+	srcnode=$(echo "$line" | awk '{ print $13; }')
+	prog=$(echo "$line" | awk '{ print $14; }')
+	args=$(echo "$line" | awk '{out=$15; for(i=16;i<=NF;i++){out=out" "$i}; print out}')
+	stdoutfile="/var/run/$pid.docker_remote.stdout"
+	stderrfile="/var/run/$pid.docker_remote.stderr"
+	rcfile="/var/run/$pid.docker_remote.rc"
+	echo "$line"
+	echo "PROCESSING REQUEST: on $srcnode run $prog $args"
+
+	echo "$prog $args" | nsenter -F --target $(docker inspect --format {{.State.Pid}} ${srcnode}) --mount --uts --ipc --net --pid > $stdoutfile 2> $stderrfile
+	rc=$?
+	echo "$rc" > $rcfile
+	echo "DONE exit code = $rc"
+
+	# remove job.
+	rm -f $job
+done
