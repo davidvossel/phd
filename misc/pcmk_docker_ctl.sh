@@ -27,7 +27,7 @@ fi
 
 action=$1
 index=$2
-container="docker${index}"
+container="${nodeprefix}${index}"
 
 case "$action" in
 	start)

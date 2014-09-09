@@ -5,6 +5,7 @@ pcmkiprange="172.17.200."
 gateway="172.17.42.1"
 containers="2"
 pcmklogs="/var/log/pacemaker.log"
+nodeprefix="docker"
 
 exec_cmd()
 {
@@ -58,9 +59,9 @@ docker_setup()
 prev_cluster_cleanup()
 {
 	echo "Cleaning up previous pacemaker docker clusters"
-	prev_image=$(docker $doc_opts ps -a | grep docker  | awk '{print $2}' | uniq)
-	docker $doc_opts stop $(docker $doc_opts ps -a | grep docker | awk '{print $1}') > /dev/null 2>&1
-	docker $doc_opts rm $(docker $doc_opts ps -a | grep docker | awk '{print $1}') > /dev/null 2>&1
+	prev_image=$(docker $doc_opts ps -a | grep ${nodeprefix}  | awk '{print $2}' | uniq)
+	docker $doc_opts stop $(docker $doc_opts ps -a | grep ${nodeprefix} | awk '{print $1}') > /dev/null 2>&1
+	docker $doc_opts rm $(docker $doc_opts ps -a | grep ${nodeprefix} | awk '{print $1}') > /dev/null 2>&1
 	if [ $reuse -eq 0 ]; then
 		docker $doc_opts rmi $prev_image > /dev/null 2>&1
 	fi
@@ -126,7 +127,7 @@ END
 write_helper_scripts()
 {
 	local index=$1
-	local name="docker${index}"
+	local name="${nodeprefix}${index}"
 	local tmp=$(mktemp)
 
 	cat << END >> $tmp
@@ -183,11 +184,12 @@ stop()
 
 	rm -f /var/lock/subsystem/\$prog
 	rm -f /var/run/\${prog}.pid
-	killall -q -9 'crmd stonithd attrd cib lrmd pacemakerd corosync pacemaker_remoted'
+	killall -q -9 'crmd stonithd attrd cib lrmd pacemakerd pacemaker_remoted'
 }
 
 stop "pacemakerd"
 /usr/share/corosync/corosync stop > /dev/null 2>&1
+killall -q -9 'crmd stonithd attrd cib lrmd pacemakerd pacemaker_remoted'
 exit 0
 END
 	chmod 755 $tmp
@@ -199,7 +201,7 @@ END
 launch_pcmk()
 {
 	local index=$1
-	local name="docker${index}"
+	local name="${nodeprefix}${index}"
 
 	verify_connection "$name"
 	exec_cmd "pcmk_start" "$name"
@@ -221,7 +223,7 @@ launch_containers()
 
 	for (( c=1; c <= $containers; c++ ))
 	do
-		name="docker${c}"
+		name="${nodeprefix}${c}"
 		echo "Launching node $name"
 
 		if [ $debug_container -eq 0 ]; then
@@ -243,7 +245,7 @@ launch_containers()
 
 	for (( c=1; c <= $containers; c++ ))
 	do
-		name="docker${c}"
+		name="${nodeprefix}${c}"
 
 		verify_connection "$name"
 		echo "setting up cluster"
@@ -268,9 +270,9 @@ launch_cts()
 	for (( c=1; c <= $containers; c++ ))
 	do
 		if [ -z $nodes ]; then
-			nodes="docker${c}"
+			nodes="${nodeprefix}${c}"
 		else
-			nodes="${nodes} docker${c}"
+			nodes="${nodes} ${nodeprefix}${c}"
 		fi
 	done
 	/usr/share/pacemaker/tests/cts/CTSlab.py --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "no" -c --test-ip-base "${iprange}100" --stack "mcp" --log-file="${pcmklogs}" --at-boot 1 100
