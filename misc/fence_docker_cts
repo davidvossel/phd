@@ -80,20 +80,25 @@ EOF
 }
 
 function docker_log() {
-	printf "$*\n" 1>&2
+	if ! [ "$action" = "list" ]; then
+		printf "$*\n" 1>&2
+	fi
 }
 
 # stdin option processing
 if [ -z $1 ]; then
 	# If there are no command line args, look for options from stdin
 	while read line; do
-	case $line in 
-		option=*|action=*) action=`echo $line | sed s/.*=//`;;
-		port=*)			port=`echo $line | sed s/.*=//`;;
-		node=*)			port=`echo $line | sed s/.*=//`;;
-		--);;
-		*) docker_log "Invalid command: $line";;
-	esac
+		for word in $(echo "$line"); do
+			case $word in 
+			option=*|action=*) action=`echo $word | sed s/.*=//`;;
+			port=*)			port=`echo $word | sed s/.*=//`;;
+			node=*)			port=`echo $word | sed s/.*=//`;;
+			nodename=*)			port=`echo $word | sed s/.*=//`;;
+			--);;
+			*) docker_log "Invalid command: $word";;
+			esac
+		done
 	done
 fi
 
@@ -154,10 +159,10 @@ exec_action()
 	chmod 755 $helper_script
 	src="$(uname -n)"
 
-	$helper_script "$src" "$action" "$returnfile" "$port" &
+	$helper_script "$src" "$action" "$returnfile" "$port" > /dev/null 2>&1 &
 	pid=$!
 	docker_log "waiting on pid $pid"
-	wait $pid
+	wait $pid > /dev/null 2>&1
 	returnstring=$(cat $returnfile)
 
 	if [ -z "$returnstring" ]; then
