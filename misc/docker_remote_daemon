@@ -45,6 +45,13 @@ while [ 1 -eq 1 ]; do
 		continue;
 	fi
 
+	user=$(echo "$line" | awk '{ print $13; }')
+	if ! [ "$user" = "root" ]; then
+		echo "ignoring cmd from non-root user \"$user\""
+		# delete job
+		rm -f $job
+	fi
+
 	echo "\n== NEW JOB ===="
 	srcnode=$(echo "$line" | awk '{ print $13; }')
 	prog=$(echo "$line" | awk '{ print $14; }')
