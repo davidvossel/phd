@@ -24,25 +24,25 @@
 #
 #######################################################################
 
+mkdir -p /var/run/docker_cts_jobs/
 
-while [ 1 -eq 1 ]; do
-	usleep 100000
-
-	job=$(ls /var/run/docker_remote* 2>/dev/null | grep -m 1 docker_remote_daemon_JOB*)
+check_job()
+{
+	job=$(ls /var/run/docker_cts_jobs/* 2>/dev/null | grep -m 1 docker_remote_daemon_JOB*)
 	if [ -z "$job" ]; then
-		continue;
+		return 1
 	fi
 
 	pid=$(cat $job)
 	if [ -z "$pid" ]; then
 		rm -f $job
-		continue;
+		return 1
 	fi
 
 	line="$(ps -aux | grep [d]ocker_remote_cmd | grep $pid)"
 	if [ -z "$line" ]; then
 		rm -f $job
-		continue;
+		return 1
 	fi
 
 	user=$(echo "$line" | awk '{ print $1; }')
@@ -50,16 +50,16 @@ while [ 1 -eq 1 ]; do
 		echo "ignoring cmd from non-root user \"$user\""
 		# delete job
 		rm -f $job
-		continue;
+		return 1
 	fi
 
 	echo "\n== NEW JOB ===="
 	srcnode=$(echo "$line" | awk '{ print $13; }')
 	prog=$(echo "$line" | awk '{ print $14; }')
 	args=$(echo "$line" | awk '{out=$15; for(i=16;i<=NF;i++){out=out" "$i}; print out}')
-	stdoutfile="/var/run/$pid.docker_remote.stdout"
-	stderrfile="/var/run/$pid.docker_remote.stderr"
-	rcfile="/var/run/$pid.docker_remote.rc"
+	stdoutfile="/var/run/docker_cts_jobs/$pid.docker_remote.stdout"
+	stderrfile="/var/run/docker_cts_jobs/$pid.docker_remote.stderr"
+	rcfile="/var/run/docker_cts_jobs/$pid.docker_remote.rc"
 	echo "$line"
 	echo "PROCESSING REQUEST: on $srcnode run $prog $args"
 
@@ -70,4 +70,16 @@ while [ 1 -eq 1 ]; do
 
 	# remove job.
 	rm -f $job
+
+	# signal pid to check stdout stderr and rc files for results
+	kill -SIGUSR1 $pid
+
+	return 0
+}
+
+while true; do
+	check_job
+	if [ $? -eq 1 ]; then
+		usleep 100000
+	fi
 done

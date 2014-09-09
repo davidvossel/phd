@@ -26,31 +26,38 @@
 
 # Command line option processing
 
-pid=$$
-rm -rf "/var/run/${pid}.docker_remote.stdout" > /dev/null 2>&1
-rm -rf "/var/run/${pid}.docker_remote.stderr" > /dev/null 2>&1
-rm -rf "/var/run/${pid}.docker_remote.rc" > /dev/null 2>&1
+trap job_finished SIGUSR1
 
-echo "$pid" > /var/run/docker_remote_daemon_JOB${pid}
-
-while true ; do
-	if [ -f "/var/run/${pid}.docker_remote.rc" ]; then
-		break
+job_finished()
+{
+	if ! [ -f "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" ]; then
+		return
 	fi
-	usleep 100000
+
+	rc=$(cat /var/run/docker_cts_jobs/${pid}.docker_remote.rc)
+	if [ -f "/var/run/docker_cts_jobs/${pid}.docker_remote.stdout" ]; then
+		timeout 2 cat /var/run/docker_cts_jobs/${pid}.docker_remote.stdout
+	fi
+
+	if [ -f "/var/run/docker_cts_jobs/$$.docker_remote.stderr" ]; then
+		timeout 2 cat /var/run/docker_cts_jobs/${pid}.docker_remote.stderr 1>&2
+	fi
+
+	rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stdout" > /dev/null 2>&1
+	rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stderr" > /dev/null 2>&1
+	rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" > /dev/null 2>&1
+
+	exit $rc
+}
+
+pid=$$
+rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stdout" > /dev/null 2>&1
+rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stderr" > /dev/null 2>&1
+rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" > /dev/null 2>&1
+
+echo "$pid" > /var/run/docker_cts_jobs/docker_remote_daemon_JOB${pid}
+
+while true; do
+	: # do nothing
 done
 
-rc=$(cat /var/run/${pid}.docker_remote.rc)
-if [ -f "/var/run/${pid}.docker_remote.stdout" ]; then
-	timeout 2 cat /var/run/${pid}.docker_remote.stdout
-fi
-
-if [ -f "/var/run/$$.docker_remote.stderr" ]; then
-	timeout 2 cat /var/run/${pid}.docker_remote.stderr 1>&2
-fi
-
-rm -rf "/var/run/${pid}.docker_remote.stdout" > /dev/null 2>&1
-rm -rf "/var/run/${pid}.docker_remote.stderr" > /dev/null 2>&1
-rm -rf "/var/run/${pid}.docker_remote.rc" > /dev/null 2>&1
-
-exit $rc
