@@ -79,6 +79,9 @@ make_image()
 	fi
 
 	echo "Making Dockerfile"
+	rm -f Dockerfile
+
+	echo "FROM $from" > Dockerfile
 
 	# this gets around a bug in rhel 7.0
 	touch /etc/yum.repos.d/redhat.repo
@@ -86,24 +89,16 @@ make_image()
 	rm -rf rpms
 	mkdir rpms
 	if [ -n "$rpmdir" ]; then
+		echo "ADD /rpms /root/" >> Dockerfile
 		cp $rpmdir/* rpms/
 	fi
 
 	rm -rf repos
 	mkdir repos
 	cp /etc/yum.repos.d/* repos/
-
-	rm -f Dockerfile
-	cat << END >> Dockerfile
-FROM $from
-ADD /repos /etc/yum.repos.d/
-ADD /rpms /root/
-RUN yum install -y /root/*.rpm
-RUN yum install -y net-tools pacemaker resource-agents pcs corosync which fence-agents-common sysvinit-tools
-ADD /launch_scripts /root/
-ADD /misc/fence_docker_cts /usr/sbin/
-ENTRYPOINT /root/launch.sh
-END
+	echo "ADD /repos /etc/yum.repos.d/" >> Dockerfile
+	echo "RUN yum install -y /root/*.rpm" >> Dockerfile
+	echo "RUN yum install -y net-tools pacemaker resource-agents pcs corosync which fence-agents-common sysvinit-tools" >> Dockerfile
 
 	# make launch script.
 	echo "Making ENTRYPOINT script"
@@ -114,6 +109,11 @@ END
 sleep 10000000
 END
 	chmod 755 launch_scripts/launch.sh
+	echo "ADD /launch_scripts /root/" >> Dockerfile
+
+	# add rest of docker file entries
+	echo "ADD /misc/fence_docker_cts /usr/sbin/" >> Dockerfile
+	echo "ENTRYPOINT /root/launch.sh" >> Dockerfile
 
 	# generate image
 	echo "Making image"
@@ -141,7 +141,7 @@ export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=${pcmkiprange}$index OCF_RESKEY_cidr
 pid=\$(pidof pacemakerd)
 if [ -z "\$pid" ];  then
 	export PCMK_debugfile=$pcmklogs
-	pacemakerd & > /dev/null 2>&1
+	(pacemakerd &) & > /dev/null 2>&1
 fi
 END
 	chmod 755 $tmp
@@ -171,6 +171,9 @@ stop()
 	    shutdown_prog="crmd"
 	fi
 
+	cname=\$(crm_node --name)
+	crm_attribute -N \$cname -n standby -v true -l reboot
+
 	if status \$shutdown_prog > /dev/null 2>&1; then
 	    kill -TERM \$(pidof \$prog) > /dev/null 2>&1
 
@@ -189,7 +192,7 @@ stop()
 
 stop "pacemakerd"
 /usr/share/corosync/corosync stop > /dev/null 2>&1
-killall -q -9 'crmd stonithd attrd cib lrmd pacemakerd pacemaker_remoted'
+killall -q -9 'corosync'
 exit 0
 END
 	chmod 755 $tmp
