@@ -57,7 +57,7 @@ rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" > /dev/null 2>&1
 
 echo "$pid" > /var/run/docker_cts_jobs/docker_remote_daemon_JOB${pid}
 
-while true; do
-	: # do nothing
+while read line; do
+	 : nothing
 done
 

@@ -26,34 +26,25 @@
 
 mkdir -p /var/run/docker_cts_jobs/
 
-check_job()
+fork_job()
 {
-	job=$(ls /var/run/docker_cts_jobs/* 2>/dev/null | grep -m 1 docker_remote_daemon_JOB*)
-	if [ -z "$job" ]; then
-		return 1
-	fi
-
-	pid=$(cat $job)
-	if [ -z "$pid" ]; then
-		rm -f $job
-		return 1
-	fi
+	local pid=$1
 
 	line="$(ps -aux | grep [d]ocker_remote_cmd | grep $pid)"
 	if [ -z "$line" ]; then
-		rm -f $job
 		return 1
 	fi
 
 	user=$(echo "$line" | awk '{ print $1; }')
 	if ! [ "$user" = "root" ]; then
 		echo "ignoring cmd from non-root user \"$user\""
-		# delete job
-		rm -f $job
 		return 1
 	fi
 
+
+
 	echo "\n== NEW JOB ===="
+
 	srcnode=$(echo "$line" | awk '{ print $13; }')
 	prog=$(echo "$line" | awk '{ print $14; }')
 	args=$(echo "$line" | awk '{out=$15; for(i=16;i<=NF;i++){out=out" "$i}; print out}')
@@ -68,12 +59,28 @@ check_job()
 	echo "$rc" > $rcfile
 	echo "DONE exit code = $rc"
 
+	# signal pid to check stdout stderr and rc files for results
+	kill -SIGUSR1 $pid
+}
+
+check_job()
+{
+	local job=$(ls /var/run/docker_cts_jobs/* 2>/dev/null | grep -m 1 docker_remote_daemon_JOB*)
+	if [ -z "$job" ]; then
+		return 1
+	fi
+
+	pid=$(cat $job)
+	if [ -z "$pid" ]; then
+		rm -f $job
+		return 1
+	fi
+
 	# remove job.
 	rm -f $job
 
-	# signal pid to check stdout stderr and rc files for results
-	kill -SIGUSR1 $pid
-
+	fork_job "$pid" &
+	
 	return 0
 }
 
