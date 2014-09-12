@@ -24,7 +24,9 @@
 #
 #######################################################################
 
-mkdir -p /var/run/docker_cts_jobs/
+
+CMD_DIR="/var/run/docker_cts_jobs"
+mkdir -p $CMD_DIR
 
 fork_job()
 {
@@ -32,12 +34,12 @@ fork_job()
 
 	echo "\n== NEW JOB ===="
 
-	srcnode="$(cat /var/run/docker_cts_jobs/docker_remote_NODE${pid})"
-	args="$(cat /var/run/docker_cts_jobs/docker_remote_ARGS${pid})"
+	srcnode="$(cat ${CMD_DIR}/NODE${pid})"
+	args="$(cat ${CMD_DIR}/ARGS${pid})"
 
-	stdoutfile="/var/run/docker_cts_jobs/$pid.docker_remote.stdout"
-	stderrfile="/var/run/docker_cts_jobs/$pid.docker_remote.stderr"
-	rcfile="/var/run/docker_cts_jobs/$pid.docker_remote.rc"
+	stdoutfile="${CMD_DIR}/$pid.stdout"
+	stderrfile="${CMD_DIR}/$pid.stderr"
+	rcfile="${CMD_DIR}/$pid.rc"
 	echo "PROCESSING REQUEST: on $srcnode run $args"
 
 	echo "$args" | nsenter --target $(docker inspect --format {{.State.Pid}} ${srcnode}) --mount --uts --ipc --net --pid > $stdoutfile 2> $stderrfile
@@ -51,7 +53,7 @@ fork_job()
 
 check_job()
 {
-	local job=$(ls /var/run/docker_cts_jobs/* 2>/dev/null | grep -m 1 docker_remote_JOB*)
+	local job=$(ls ${CMD_DIR}/* 2>/dev/null | grep -m 1 JOB*)
 	if [ -z "$job" ]; then
 		return 1
 	fi

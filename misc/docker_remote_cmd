@@ -28,40 +28,42 @@
 
 trap job_finished SIGUSR1
 
+CMD_DIR="/var/run/docker_cts_jobs"
+
 job_finished()
 {
-	if ! [ -f "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" ]; then
+	if ! [ -f "${CMD_DIR}/${pid}.rc" ]; then
 		return
 	fi
 
-	rc=$(cat /var/run/docker_cts_jobs/${pid}.docker_remote.rc)
-	if [ -f "/var/run/docker_cts_jobs/${pid}.docker_remote.stdout" ]; then
-		timeout 2 cat /var/run/docker_cts_jobs/${pid}.docker_remote.stdout
+	rc=$(cat ${CMD_DIR}/${pid}.rc)
+	if [ -f "${CMD_DIR}/${pid}.stdout" ]; then
+		timeout 2 cat ${CMD_DIR}/${pid}.stdout
 	fi
 
-	if [ -f "/var/run/docker_cts_jobs/$$.docker_remote.stderr" ]; then
-		timeout 2 cat /var/run/docker_cts_jobs/${pid}.docker_remote.stderr 1>&2
+	if [ -f "${CMD_DIR}/$$.stderr" ]; then
+		timeout 2 cat ${CMD_DIR}/${pid}.stderr 1>&2
 	fi
 
-	rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stdout" > /dev/null 2>&1
-	rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stderr" > /dev/null 2>&1
-	rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" > /dev/null 2>&1
+	rm -rf "${CMD_DIR}/${pid}.stdout" > /dev/null 2>&1
+	rm -rf "${CMD_DIR}/${pid}.stderr" > /dev/null 2>&1
+	rm -rf "${CMD_DIR}/${pid}.rc" > /dev/null 2>&1
 
-	rm -f "/var/run/docker_cts_jobs/docker_remote_NODE${pid}" > /dev/null 2>&1
-	rm -f "/var/run/docker_cts_jobs/docker_remote_ARGS${pid}" > /dev/null 2>&1
-	rm -f "/var/run/docker_cts_jobs/docker_remote_JOB${pid}" > /dev/null 2>&1
+	rm -f "${CMD_DIR}/NODE${pid}" > /dev/null 2>&1
+	rm -f "${CMD_DIR}/ARGS${pid}" > /dev/null 2>&1
+	rm -f "${CMD_DIR}/JOB${pid}" > /dev/null 2>&1
 	exit $rc
 }
 
 pid=$$
-rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stdout" > /dev/null 2>&1
-rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stderr" > /dev/null 2>&1
-rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" > /dev/null 2>&1
+rm -rf "${CMD_DIR}/${pid}.stdout" > /dev/null 2>&1
+rm -rf "${CMD_DIR}/${pid}.stderr" > /dev/null 2>&1
+rm -rf "${CMD_DIR}/${pid}.rc" > /dev/null 2>&1
 
-echo "$1" > /var/run/docker_cts_jobs/docker_remote_NODE${pid}
+echo "$1" > ${CMD_DIR}/NODE${pid}
 shift;
-echo "$@" > /var/run/docker_cts_jobs/docker_remote_ARGS${pid}
-echo "$pid" > /var/run/docker_cts_jobs/docker_remote_JOB${pid}
+echo "$@" > ${CMD_DIR}/ARGS${pid}
+echo "$pid" > ${CMD_DIR}/JOB${pid}
 
 while read line; do
 	 : nothing
