@@ -34,6 +34,12 @@ nodeprefix="docker"
 if [ -z "$PHD_DOCKER_LIB" ]; then
 	PHD_DOCKER_LIB="/usr/libexec/phd/docker"
 fi
+if [ -z "$PHD_DOCKER_LOGDIR" ]; then
+	PHD_DOCKER_LOGDIR="/var/lib/phd/"
+fi
+
+mkdir -p $PHD_DOCKER_LOGDIR
+mkdir -p $PHD_DOCKER_LIB
 
 exec_cmd()
 {
@@ -69,9 +75,9 @@ rm_from_file()
 docker_setup()
 {
 	# make sure we have docker installed
-	yum list installed | grep "docker-io" > /dev/null 2>&1
+	yum list installed | grep "docker" > /dev/null 2>&1
 	if [ $? -ne 0 ]; then
-		yum install docker-io docker
+		yum install docker-io docker > /dev/null 2>&1
 	fi
 	systemctl start docker
 	# handle base image retrieval
@@ -314,20 +320,41 @@ launch_containers()
 
 }
 
+kill_cts_daemons()
+{
+	killall -9 fence_docker_daemon
+	killall -9 phd_docker_remote_daemon
+}
+
+
+launch_cts_daemons()
+{
+	kill_cts_daemons
+
+
+	rm -f ${PHD_DOCKER_LOGDIR}/fence_docker_daemon.log
+	rm -f ${PHD_DOCKER_LOGDIR}/phd_docker_remote_daemon.log
+	$PHD_DOCKER_LIB/fence_docker_daemon > ${PHD_DOCKER_LOGDIR}/fence_docker_daemon.log 2>&1 &
+	$PHD_DOCKER_LIB/phd_docker_remote_daemon > ${PHD_DOCKER_LOGDIR}/phd_docker_remote_daemon.log 2>&1 &
+}
+
 launch_cts()
 {
-	if [ $run_cts -eq 0 ]; then
-		return;
-	fi
+	local iterations=$1
+	local nodes
 
 	for (( c=1; c <= $containers; c++ ))
 	do
-		if [ -z $nodes ]; then
+		if [ -z "$nodes" ]; then
 			nodes="${nodeprefix}${c}"
 		else
 			nodes="${nodes} ${nodeprefix}${c}"
 		fi
 	done
-	/usr/share/pacemaker/tests/cts/CTSlab.py --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "no" -c --test-ip-base "${iprange}100" --stack "mcp" --log-file="${pcmklogs}" --at-boot 1 100
+
+	launch_cts_daemons
+	/usr/share/pacemaker/tests/cts/CTSlab.py --logfile $pcmklogs --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "rhcs" -c --test-ip-base "${iprange}200" --stack "mcp" --at-boot 0 $iterations
+	kill_cts_daemons
+
 }
 
