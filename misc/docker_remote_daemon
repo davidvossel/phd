@@ -30,31 +30,17 @@ fork_job()
 {
 	local pid=$1
 
-	line="$(ps -aux | grep [d]ocker_remote_cmd | grep $pid)"
-	if [ -z "$line" ]; then
-		return 1
-	fi
-
-	user=$(echo "$line" | awk '{ print $1; }')
-	if ! [ "$user" = "root" ]; then
-		echo "ignoring cmd from non-root user \"$user\""
-		return 1
-	fi
-
-
-
 	echo "\n== NEW JOB ===="
 
-	srcnode=$(echo "$line" | awk '{ print $13; }')
-	prog=$(echo "$line" | awk '{ print $14; }')
-	args=$(echo "$line" | awk '{out=$15; for(i=16;i<=NF;i++){out=out" "$i}; print out}')
+	srcnode="$(cat /var/run/docker_cts_jobs/docker_remote_NODE${pid})"
+	args="$(cat /var/run/docker_cts_jobs/docker_remote_ARGS${pid})"
+
 	stdoutfile="/var/run/docker_cts_jobs/$pid.docker_remote.stdout"
 	stderrfile="/var/run/docker_cts_jobs/$pid.docker_remote.stderr"
 	rcfile="/var/run/docker_cts_jobs/$pid.docker_remote.rc"
-	echo "$line"
-	echo "PROCESSING REQUEST: on $srcnode run $prog $args"
+	echo "PROCESSING REQUEST: on $srcnode run $args"
 
-	echo "$prog $args" | nsenter --target $(docker inspect --format {{.State.Pid}} ${srcnode}) --mount --uts --ipc --net --pid > $stdoutfile 2> $stderrfile
+	echo "$args" | nsenter --target $(docker inspect --format {{.State.Pid}} ${srcnode}) --mount --uts --ipc --net --pid > $stdoutfile 2> $stderrfile
 	rc=$?
 	echo "$rc" > $rcfile
 	echo "DONE exit code = $rc"
@@ -65,7 +51,7 @@ fork_job()
 
 check_job()
 {
-	local job=$(ls /var/run/docker_cts_jobs/* 2>/dev/null | grep -m 1 docker_remote_daemon_JOB*)
+	local job=$(ls /var/run/docker_cts_jobs/* 2>/dev/null | grep -m 1 docker_remote_JOB*)
 	if [ -z "$job" ]; then
 		return 1
 	fi

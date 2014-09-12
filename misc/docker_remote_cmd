@@ -47,6 +47,9 @@ job_finished()
 	rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stderr" > /dev/null 2>&1
 	rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" > /dev/null 2>&1
 
+	rm -f "/var/run/docker_cts_jobs/docker_remote_NODE${pid}" > /dev/null 2>&1
+	rm -f "/var/run/docker_cts_jobs/docker_remote_ARGS${pid}" > /dev/null 2>&1
+	rm -f "/var/run/docker_cts_jobs/docker_remote_JOB${pid}" > /dev/null 2>&1
 	exit $rc
 }
 
@@ -55,7 +58,10 @@ rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stdout" > /dev/null 2>&1
 rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.stderr" > /dev/null 2>&1
 rm -rf "/var/run/docker_cts_jobs/${pid}.docker_remote.rc" > /dev/null 2>&1
 
-echo "$pid" > /var/run/docker_cts_jobs/docker_remote_daemon_JOB${pid}
+echo "$1" > /var/run/docker_cts_jobs/docker_remote_NODE${pid}
+shift;
+echo "$@" > /var/run/docker_cts_jobs/docker_remote_ARGS${pid}
+echo "$pid" > /var/run/docker_cts_jobs/docker_remote_JOB${pid}
 
 while read line; do
 	 : nothing
