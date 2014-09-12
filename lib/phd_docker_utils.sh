@@ -77,7 +77,7 @@ docker_setup()
 	# make sure we have docker installed
 	yum list installed | grep "docker" > /dev/null 2>&1
 	if [ $? -ne 0 ]; then
-		yum install docker-io docker > /dev/null 2>&1
+		yum install -y docker 
 	fi
 	systemctl start docker
 	# handle base image retrieval
