@@ -322,8 +322,8 @@ launch_containers()
 
 kill_cts_daemons()
 {
-	killall -9 fence_docker_daemon
-	killall -9 phd_docker_remote_daemon
+	killall -9 fence_docker_daemon > /dev/null 2>&1
+	killall -9 phd_docker_remote_daemon > /dev/null 2>&1
 }
 
 
@@ -353,8 +353,7 @@ launch_cts()
 	done
 
 	launch_cts_daemons
-	/usr/share/pacemaker/tests/cts/CTSlab.py --logfile $pcmklogs --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "rhcs" -c --test-ip-base "${iprange}200" --stack "mcp" --at-boot 0 $iterations
+	/usr/share/pacemaker/tests/cts/CTSlab.py --logfile $pcmklogs --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "docker" --docker -c --test-ip-base "${iprange}200" --stack "mcp" --at-boot 0 $iterations
 	kill_cts_daemons
-
 }
 
