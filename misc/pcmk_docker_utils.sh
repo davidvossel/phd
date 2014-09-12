@@ -128,8 +128,9 @@ write_helper_scripts()
 {
 	local index=$1
 	local name="${nodeprefix}${index}"
-	local tmp=$(mktemp)
+	local tmp
 
+	tmp=$(mktemp)
 	cat << END >> $tmp
 #!/bin/bash
 
@@ -139,15 +140,28 @@ export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=${pcmkiprange}$index OCF_RESKEY_cidr
 /usr/share/corosync/corosync start > /dev/null 2>&1
 
 pid=\$(pidof pacemakerd)
-if [ -z "\$pid" ];  then
+if [ "\$?" -ne 0 ];  then
+	mkdir -p /var/run
+
 	export PCMK_debugfile=$pcmklogs
 	(pacemakerd &) & > /dev/null 2>&1
+	sleep 5
+
+	pid=\$(pidof pacemakerd)
+	if [ "\$?" -ne 0 ]; then
+		echo "startup of pacemaker failed"
+		exit 1
+	fi
+	echo "$pid" > /var/run/pacemakerd.pid
 fi
+exit 0
 END
 	chmod 755 $tmp
 	cp $tmp "/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/usr/sbin/pcmk_start"
+	rm -f $tmp
 
 
+	tmp=$(mktemp)
 	cat << END >> $tmp
 #!/bin/bash
 status()
@@ -185,7 +199,7 @@ stop()
 	    echo -n "\$desc is already stopped"
 	fi
 
-	rm -f /var/lock/subsystem/\$prog
+	rm -f /var/lock/subsystem/pacemaker
 	rm -f /var/run/\${prog}.pid
 	killall -q -9 'crmd stonithd attrd cib lrmd pacemakerd pacemaker_remoted'
 }
