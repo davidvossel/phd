@@ -31,13 +31,18 @@ function respond()
 	node=$3
 	pid=$4
 
+
 	us="$(uname -n)"
 	echo "Sending Response to source node: $node"
 	echo "Return String: $string"
 	if [ "$us" = "$node" ]; then
 		write_file=$returnfile
 	else
-		write_file="/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/$returnfile"
+		dock_id="$(docker inspect --format {{.ID}} $node)"
+		if [ "$dock_id" = "<no value>" ]; then
+			dock_id="$(docker inspect --format {{.Id}} $node)"
+		fi
+		write_file="/var/lib/docker/devicemapper/mnt/${dock_id}/rootfs/$returnfile"
 	fi
 
 	echo "Return File: $write_file"
