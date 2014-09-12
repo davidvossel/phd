@@ -31,6 +31,10 @@ containers="2"
 pcmklogs="/var/log/pacemaker.log"
 nodeprefix="docker"
 
+if [ -z "$PHD_DOCKER_LIB" ]; then
+	PHD_DOCKER_LIB="/usr/libexec/phd/docker"
+fi
+
 exec_cmd()
 {
 	echo "$1" | nsenter --target $(docker inspect --format {{.State.Pid}} ${2}) --mount --uts --ipc --net --pid
@@ -110,18 +114,19 @@ make_image()
 	# this gets around a bug in rhel 7.0
 	touch /etc/yum.repos.d/redhat.repo
 
-	rm -rf rpms
-	mkdir rpms
-	if [ -n "$rpmdir" ]; then
-		echo "ADD /rpms /root/" >> Dockerfile
-		cp $rpmdir/* rpms/
-	fi
-
 	rm -rf repos
 	mkdir repos
 	cp /etc/yum.repos.d/* repos/
 	echo "ADD /repos /etc/yum.repos.d/" >> Dockerfile
-	echo "RUN yum install -y /root/*.rpm" >> Dockerfile
+
+	rm -rf rpms
+	mkdir rpms
+	if [ -n "$rpmdir" ]; then
+		echo "ADD /rpms /root/" >> Dockerfile
+		echo "RUN yum install -y /root/*.rpm" >> Dockerfile
+		cp $rpmdir/* rpms/
+	fi
+
 	echo "RUN yum install -y net-tools pacemaker resource-agents pcs corosync which fence-agents-common sysvinit-tools" >> Dockerfile
 
 	# make launch script.
@@ -135,8 +140,11 @@ END
 	chmod 755 launch_scripts/launch.sh
 	echo "ADD /launch_scripts /root/" >> Dockerfile
 
+	rm -rf bin_files
+	mkdir bin_files
+	cp ${PHD_DOCKER_LIB}/fence_docker_cts bin_files/fence_docker_cts
 	# add rest of docker file entries
-	echo "ADD /misc/fence_docker_cts /usr/sbin/" >> Dockerfile
+	echo "ADD bin_files/fence_docker_cts /usr/sbin/" >> Dockerfile
 	echo "ENTRYPOINT /root/launch.sh" >> Dockerfile
 
 	# generate image
@@ -144,8 +152,12 @@ END
 	docker $doc_opts build .
 	if [ $? -ne 0 ]; then
 		echo "ERROR: failed to generate docker image"
+		exit 1
 	fi
 	image=$(docker $doc_opts images -q | head -n 1)
+
+	# cleanup
+	rm -rf bin_files rpms repos launch_scripts
 }
 
 write_helper_scripts()

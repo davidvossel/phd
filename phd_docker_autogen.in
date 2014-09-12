@@ -24,9 +24,11 @@
 #
 #######################################################################
 
-. misc/pcmk_docker_utils.sh
+PHD_DOCKER_LIB="@libexecdir@/phd/docker"
 
-from="fedora"
+.  ${PHD_DOCKER_LIB}/phd_docker_utils.sh
+
+from="centos:centos7"
 #from="fedora"
 pull=0
 reuse=0
