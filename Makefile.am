@@ -18,4 +18,4 @@ SUBDIRS	= lib tests scenarios environment doc
 
 ACLOCAL_AMFLAGS		= -I m4
 
-sbin_SCRIPTS = phd_exec phd_docker_autogen phd_docker_cmd phd_docker_cp
+sbin_SCRIPTS = phd_exec phd_docker_autogen phd_docker_cmd
