@@ -367,7 +367,7 @@ launch_cts()
 	done
 
 	launch_cts_daemons
-	/usr/share/pacemaker/tests/cts/CTSlab.py --logfile $pcmklogs --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "docker" --docker -c --test-ip-base "${iprange}200" --stack "mcp" --at-boot 0 $iterations
+	/usr/share/pacemaker/tests/cts/CTSlab.py --docker --logfile $pcmklogs --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "docker" -c --test-ip-base "${iprange}200" --stack "mcp" --at-boot 0 $iterations
 	kill_cts_daemons
 }
 
