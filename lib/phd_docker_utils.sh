@@ -41,6 +41,20 @@ fi
 mkdir -p $PHD_DOCKER_LOGDIR
 mkdir -p $PHD_DOCKER_LIB
 
+cp_cmd()
+{
+	local src=$1
+	local dst=$2
+	local node=$3
+
+	local dock_id="$(docker inspect --format {{.ID}} $node)"
+	if [ "$dock_id" = "<no value>" ]; then
+		dock_id="$(docker inspect --format {{.Id}} $node)"
+	fi
+
+	cp $src "/var/lib/docker/devicemapper/mnt/${dock_id}/rootfs/${dst}"
+}
+
 exec_cmd()
 {
 	echo "$1" | nsenter --target $(docker inspect --format {{.State.Pid}} ${2}) --mount --uts --ipc --net --pid
@@ -199,7 +213,7 @@ fi
 exit 0
 END
 	chmod 755 $tmp
-	cp $tmp "/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/usr/sbin/pcmk_start"
+	cp_cmd $tmp /usr/sbin/pcmk_start $node
 	rm -f $tmp
 
 
@@ -252,7 +266,7 @@ killall -q -9 'corosync'
 exit 0
 END
 	chmod 755 $tmp
-	cp $tmp "/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/usr/sbin/pcmk_stop"
+	cp_cmd $tmp /usr/sbin/pcmk_stop $node
 
 	rm -f $tmp
 }

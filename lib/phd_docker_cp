@@ -39,9 +39,12 @@ if [ -z "$node" ]; then
 	node=$target_dst
 fi
 
-
 if [ "$us" = "$node" ] || [ "localhost" = "$node" ]; then
 	cp $1 $target_file
 else
-	cp $1 "/var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.Id}} $node)/rootfs/$target_file"
+	dock_id="$(docker inspect --format {{.ID}} $node)"
+	if [ "$dock_id" = "<no value>" ]; then
+		dock_id="$(docker inspect --format {{.Id}} $node)"
+	fi
+	cp $1 "/var/lib/docker/devicemapper/mnt/${dock_id}/rootfs/$target_file"
 fi
