@@ -42,6 +42,7 @@ systemctl disable pacemaker
 systemctl disable corosync
 chkconfig pacemaker off
 chkconfig corosync off
+setenforce 0
 exit 0
 ....
 
