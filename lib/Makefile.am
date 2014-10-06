@@ -13,10 +13,4 @@ phd_lib_SCRIPTS = definition.sh	\
 	transport_qarsh.sh	\
 	transport_ssh.sh
 
-phd_docker_SCRIPTS = phd_docker_utils.sh	\
-	fence_docker_daemon	\
-	fence_docker_cts	\
-	phd_docker_remote_daemon	\
-	phd_docker_remote_cmd	\
-	phd_docker_cp
-
+SUBDIRS	= docker

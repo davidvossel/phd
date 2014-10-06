@@ -91,6 +91,7 @@ Makefile \
 phd_exec \
 phd_docker_autogen \
 lib/Makefile	\
+lib/docker/Makefile	\
 scenarios/Makefile	\
 tests/Makefile	\
 environment/Makefile	\
