@@ -153,9 +153,12 @@ make_image()
 	echo "Making ENTRYPOINT script"
 	rm -rf launch_scripts
 	mkdir launch_scripts
+	# by default make an idle docker container that we can dynamically start/stop pcmk in
 	cat << END >> launch_scripts/launch.sh
 #!/bin/bash
-sleep 10000000
+while true; do
+	sleep 1
+done
 END
 	chmod 755 launch_scripts/launch.sh
 	echo "ADD /launch_scripts /root/" >> Dockerfile
