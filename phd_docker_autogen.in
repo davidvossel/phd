@@ -45,7 +45,7 @@ debug_container=0
 rpmdir=""
 
 function helptext() {
-	echo "pcmk_docker_autogen.sh - A tool for generating pacemaker clusters locally with docker containers."
+	echo "pcmk_docker_autogen - A tool for generating pacemaker clusters locally with docker containers."
 	echo ""
 	echo "Usage: pcmk_docker_autogen.sh [options]"
 	echo ""
@@ -57,8 +57,7 @@ function helptext() {
 	echo "-i, --cts-iterations The number of cts iterations to execute  on the newly created docker containers"
 	echo "-p, --pull           Force pull \"from\" image regardless if it exists or not."
 	echo "-r, --reuse-image    Reuse image built from previous cluster if previous image is detected."
-	echo "-R, --rpm-copu       Copy rpms in this directory to image for install".
-	echo "-t, --cts-test       Run cts on docker instances"
+	echo "-R, --rpm-copy       Copy rpms in this directory to image for install".
 	echo ""
 	exit $1
 }
@@ -75,7 +74,9 @@ while true ; do
 	-r|--reuse) reuse=1; shift;;
 	-R|--rpm-copy) rpmdir=$2; shift; shift;;
 	"") break;;
-	*) helptext 1;;
+	*) 
+		echo "unknown option $1"
+		helptext 1;;
 	esac
 done
 
