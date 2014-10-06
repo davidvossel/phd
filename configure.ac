@@ -88,12 +88,13 @@ eval mandir="`eval echo ${mandir}`"
 
 AC_CONFIG_FILES(
 Makefile \
-phd_exec \
-phd_docker_autogen \
 lib/Makefile	\
 lib/docker/Makefile	\
 scenarios/Makefile	\
 tests/Makefile	\
+tools/Makefile	\
+tools/phd_exec \
+tools/phd_docker_autogen \
 environment/Makefile	\
 doc/Makefile	\
 )
