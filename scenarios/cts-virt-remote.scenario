@@ -77,5 +77,5 @@ fi
 
 rm -f /var/log/cts.log
 
-/usr/share/pacemaker/tests/cts/CTSlab.py --outputfile /var/log/cts.log --nodes "$PHD_ENV_nodes" -r --stonith "rhcs" -c --test-ip-base "$PHD_ENV_floating_ips1" --stack "$stack" --at-boot 0 --container-tests --choose RemoteBaremetal --choose RemoteLXC 100
+/usr/share/pacemaker/tests/cts/CTSlab.py --outputfile /var/log/cts.log --nodes "$PHD_ENV_nodes" -r --stonith "rhcs" -c --test-ip-base "$PHD_ENV_floating_ips1" --stack "$stack" --at-boot 0 --container-tests --choose RemoteLXC --choose RemoteBasic --choose RemoteMigrate --choose RemoteStonithd --choose RemoteRscFailure 100
 ....
