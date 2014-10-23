@@ -1,0 +1,112 @@
+# Example docker container management scenario
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs docker
+cluster_init=1
+floating_ips=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Initialize apache config cleanup previous run
+##
+target=all
+....
+
+# clean up previous containers and images
+docker stop httpd > /dev/null 2>&1
+docker rm httpd > /dev/null 2>&1
+docker rmi centos:custom_httpd > /dev/null 2>&1
+rm -f /var/www/html/index.html
+
+mkdir -p /var/www/html/
+touch /var/www/html/index.html
+
+cat << END >> /var/www/html/index.html
+<html>
+<body>My Test Site</body>
+</html>
+END
+....
+
+##
+# Make docker images on both nodes for apache.
+##
+target=all
+....
+
+service docker start
+
+from="centos:centos7"
+to="centos:custom_httpd"
+
+docker pull "$from"
+if [ $? -ne 0 ]; then
+	echo "ERROR: failed to pull docker image $from"
+	exit 1
+fi
+
+# make docker file
+rm -f Dockerfile
+echo "FROM $from" > Dockerfile
+# this gets around a bug in rhel 7.0
+touch /etc/yum.repos.d/redhat.repo
+rm -rf repos
+mkdir repos
+cp /etc/yum.repos.d/* repos/
+echo "ADD /repos /etc/yum.repos.d/" >> Dockerfile
+echo "RUN yum install -y net-tools wget httpd " >> Dockerfile
+
+# create entry point for container
+rm -rf entrypoint
+mkdir entrypoint
+touch entrypoint/start.sh
+echo "#!/bin/bash" >> entrypoint/start.sh
+echo "mkdir /run/httpd/" >> entrypoint/start.sh
+echo "chown -R apache /run/httpd" >> entrypoint/start.sh
+echo "chgrp -R apache /run/httpd" >> entrypoint/start.sh
+echo "/usr/sbin/httpd -DFOREGROUND" >> entrypoint/start.sh
+chmod 755 entrypoint/start.sh
+echo "ADD /entrypoint /root/" >> Dockerfile
+echo "ENTRYPOINT /root/start.sh" >> Dockerfile
+
+# build new image with apache in it from our base image.
+docker build -t "$to" .
+if [ $? -ne 0 ]; then
+	echo "ERROR: failed to generate docker image"
+	exit 1
+fi
+
+#cleanup
+rm -rf repos Dockerfile entrypoint
+....
+
+##
+# Make the cluster apache and floating ip resources
+##
+target=$PHD_ENV_nodes1
+....
+pcs resource create web-ip ocf:heartbeat:IPaddr2 ip=$PHD_ENV_floating_ips1
+pcs resource create web-site docker image=centos:custom_httpd container=httpd run_opts="-P -p 80:80 -v /var/www/html/index.html:/var/www/html/index.html"
+pcs resource group add web-group web-site web-ip
+....
+
+
+##
+# Verify connectivity to http via floating ip
+##
+target=all
+....
+wget ${PHD_ENV_floating_ips1}/index.html
+if [ $? -ne 0 ]; then
+	echo "ERROR: failed to contact httpd server"
+	exit 1
+fi
+....
