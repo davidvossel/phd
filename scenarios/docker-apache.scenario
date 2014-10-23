@@ -15,21 +15,31 @@ floating_ips=1
 = SCRIPTS =
 
 ##
-# Initialize apache config cleanup previous run
+# cleanup anything left over from previous run
 ##
 target=all
 ....
+# make sure docker services are up
+service docker start
 
 # clean up previous containers and images
 docker stop httpd > /dev/null 2>&1
 docker rm httpd > /dev/null 2>&1
 docker rmi centos:custom_httpd > /dev/null 2>&1
-rm -f /var/www/html/index.html
+rm -f /html_share/index.html
+rm -rf Dockerfile entrypoint
 
-mkdir -p /var/www/html/
-touch /var/www/html/index.html
+....
 
-cat << END >> /var/www/html/index.html
+##
+# Initialize http index file.
+# This index file is mounted within the container
+##
+target=all
+....
+mkdir -p /html_share
+touch /html_share/index.html
+cat << END >> /html_share/index.html
 <html>
 <body>My Test Site</body>
 </html>
@@ -41,9 +51,6 @@ END
 ##
 target=all
 ....
-
-service docker start
-
 from="centos:centos7"
 to="centos:custom_httpd"
 
@@ -53,27 +60,19 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-# make docker file
-rm -f Dockerfile
-echo "FROM $from" > Dockerfile
-# this gets around a bug in rhel 7.0
-touch /etc/yum.repos.d/redhat.repo
-rm -rf repos
-mkdir repos
-cp /etc/yum.repos.d/* repos/
-echo "ADD /repos /etc/yum.repos.d/" >> Dockerfile
-echo "RUN yum install -y net-tools wget httpd " >> Dockerfile
-
 # create entry point for container
-rm -rf entrypoint
 mkdir entrypoint
 touch entrypoint/start.sh
+chmod 755 entrypoint/start.sh
 echo "#!/bin/bash" >> entrypoint/start.sh
 echo "mkdir /run/httpd/" >> entrypoint/start.sh
 echo "chown -R apache /run/httpd" >> entrypoint/start.sh
 echo "chgrp -R apache /run/httpd" >> entrypoint/start.sh
 echo "/usr/sbin/httpd -DFOREGROUND" >> entrypoint/start.sh
-chmod 755 entrypoint/start.sh
+
+# Create Dockerfile for image creation.
+echo "FROM $from" > Dockerfile
+echo "RUN yum install -y wget httpd " >> Dockerfile
 echo "ADD /entrypoint /root/" >> Dockerfile
 echo "ENTRYPOINT /root/start.sh" >> Dockerfile
 
@@ -84,8 +83,8 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-#cleanup
-rm -rf repos Dockerfile entrypoint
+# cleanup
+rm -rf Dockerfile entrypoint
 ....
 
 ##
@@ -93,11 +92,11 @@ rm -rf repos Dockerfile entrypoint
 ##
 target=$PHD_ENV_nodes1
 ....
-pcs resource create web-ip ocf:heartbeat:IPaddr2 ip=$PHD_ENV_floating_ips1
-pcs resource create web-site docker image=centos:custom_httpd container=httpd run_opts="-P -p 80:80 -v /var/www/html/index.html:/var/www/html/index.html"
-pcs resource group add web-group web-site web-ip
-....
+pcs resource create web-site docker image=centos:custom_httpd container=httpd run_opts="-p 80:80 -v /html_share:/var/www/html" --group web-group
+pcs resource create web-ip ocf:heartbeat:IPaddr2 ip=$PHD_ENV_floating_ips1 --group web-group
 
+phd_rsc_verify_start_all 60
+....
 
 ##
 # Verify connectivity to http via floating ip
@@ -109,4 +108,5 @@ if [ $? -ne 0 ]; then
 	echo "ERROR: failed to contact httpd server"
 	exit 1
 fi
+rm -f index.html
 ....
