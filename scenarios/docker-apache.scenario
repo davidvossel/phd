@@ -92,7 +92,7 @@ rm -rf Dockerfile entrypoint
 ##
 target=$PHD_ENV_nodes1
 ....
-pcs resource create web-site docker image=centos:custom_httpd container=httpd run_opts="-p 80:80 -v /html_share:/var/www/html" --group web-group
+pcs resource create web-site docker image=centos:custom_httpd run_opts="-p 80:80 -v /html_share:/var/www/html" --group web-group
 pcs resource create web-ip ocf:heartbeat:IPaddr2 ip=$PHD_ENV_floating_ips1 --group web-group
 
 phd_rsc_verify_start_all 60
