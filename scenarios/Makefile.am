@@ -18,6 +18,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	iscsi-cleanup.scenario	\
 	iscsi-logicalunit.scenario	\
 	iscsi-logicalunit-targetcli.scenario	\
+	iscsi-target-targetcli.scenario		\
 	mariadb-basic.scenario	\
 	nfs-active-active.scenario	\
 	nfs-active-passive.scenario	\
