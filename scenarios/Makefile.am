@@ -9,6 +9,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	cts-virt.scenario	\
 	cts-virt-remote.scenario	\
 	docker-apache.scenario		\
+	docker-apache-aa.scenario	\
 	ethmonitor-basic.scenario	\
 	example.scenario	\
 	gfs2-clvmd.scenario	\
