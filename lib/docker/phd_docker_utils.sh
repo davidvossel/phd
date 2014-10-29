@@ -136,8 +136,10 @@ make_image()
 
 	rm -rf repos
 	mkdir repos
-	cp /etc/yum.repos.d/* repos/
-	echo "ADD /repos /etc/yum.repos.d/" >> Dockerfile
+	if [ -n "$repodir" ]; then
+		cp $repodir/* repos/
+		echo "ADD /repos /etc/yum.repos.d/" >> Dockerfile
+	fi
 
 	rm -rf rpms
 	mkdir rpms

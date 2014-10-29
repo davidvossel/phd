@@ -55,6 +55,7 @@ function helptext() {
 	echo "-D, --debug-mode     Launch a container in interactive mode for testing."
 	echo "-f, --from           Specify the FROM image to base the docker containers off of. Default is \"$from\""
 	echo "-i, --cts-iterations The number of cts iterations to execute  on the newly created docker containers"
+	echo "-o, --repo-copy      Copy the repos in this host directory into the image's /etc/yum.repos.d/ directory"
 	echo "-p, --pull           Force pull \"from\" image regardless if it exists or not."
 	echo "-r, --reuse-image    Reuse image built from previous cluster if previous image is detected."
 	echo "-R, --rpm-copy       Copy rpms in this directory to image for install".
@@ -70,6 +71,7 @@ while true ; do
 	-D|--debug-mode) debug_container=1; shift;;
 	-f|--from) from="$2"; shift; shift;;
 	-i|--cts-iterations) cts_iterations="$2"; shift; shift;;
+	-o|--repo-copy) repodir=$2; shift; shift;;
 	-p|--pull) pull=1; shift;;
 	-r|--reuse) reuse=1; shift;;
 	-R|--rpm-copy) rpmdir=$2; shift; shift;;
