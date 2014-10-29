@@ -359,8 +359,12 @@ launch_cts_daemons()
 
 launch_cts()
 {
-	local iterations=$1
+	local iterations="$1"
 	local nodes
+
+	if [ "$iterations" = "0" ]; then
+		iterations="--once"
+	fi
 
 	for (( c=1; c <= $containers; c++ ))
 	do

@@ -39,7 +39,7 @@ pull=0
 reuse=0
 prev_image=""
 image=""
-cts_iterations=0
+cts_iterations=""
 doc_opts=""
 debug_container=0
 rpmdir=""
@@ -88,7 +88,7 @@ prev_cluster_cleanup
 make_image
 launch_containers
 launch_pcmk_all
-if [ $cts_iterations -ne 0 ]; then
+if [ -n "$cts_iterations" ]; then
 	launch_cts $cts_iterations
 fi
 
