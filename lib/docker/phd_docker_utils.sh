@@ -368,6 +368,7 @@ launch_cts()
 {
 	local iterations="$1"
 	local nodes
+	local rc=0
 
 	if [ "$iterations" = "0" ]; then
 		iterations="--once"
@@ -384,7 +385,9 @@ launch_cts()
 
 	launch_cts_daemons
 	/usr/share/pacemaker/tests/cts/CTSlab.py --docker --logfile $pcmklogs --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "docker" -c --test-ip-base "${iprange}200" --stack "mcp" --at-boot 0 $iterations
+	rc=$?
 	kill_cts_daemons
+	return $rc
 }
 
 launch_stonith_tests()
