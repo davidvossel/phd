@@ -27,7 +27,6 @@
 iprange="172.17.0."
 pcmkiprange="172.17.200."
 gateway="172.17.42.1"
-containers="2"
 pcmklogs="/var/log/pacemaker.log"
 nodeprefix="docker"
 
@@ -194,10 +193,18 @@ write_helper_scripts()
 	tmp=$(mktemp)
 	cat << END >> $tmp
 #!/bin/bash
-
 export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=${pcmkiprange}$index OCF_RESKEY_cidr_netmask=32
 /usr/lib/ocf/resource.d/heartbeat/IPaddr2 start
+END
+	chmod 755 $tmp
+	cp_cmd $tmp /usr/sbin/ip_start $node
+	rm -f $tmp
 
+	tmp=$(mktemp)
+	cat << END >> $tmp
+#!/bin/bash
+
+/usr/sbin/ip_start
 /usr/share/corosync/corosync start > /dev/null 2>&1
 
 pid=\$(pidof pacemakerd)
@@ -380,3 +387,9 @@ launch_cts()
 	kill_cts_daemons
 }
 
+launch_stonith_tests()
+{
+	local name="${nodeprefix}1"
+	exec_cmd "/usr/sbin/ip_start" "$name"
+	exec_cmd "/usr/share/pacemaker/tests/fencing/regression.py" "$name"
+}

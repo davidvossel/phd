@@ -19,6 +19,11 @@ floating_ips=1
 ##
 target=all
 ....
+# consistent authkey
+mkdir -p /etc/pacemaker
+rm -f /etc/pacemaker/authkey
+echo "this is a pretty insecure key, but at least it is predictable" > /etc/pacemaker/authkey
+
 # make sure docker services are up
 service docker start
 
@@ -27,7 +32,6 @@ docker stop dummy > /dev/null 2>&1
 docker rm dummy > /dev/null 2>&1
 docker rmi centos:custom_dummy > /dev/null 2>&1
 rm -rf Dockerfile entrypoint
-
 ....
 
 target=all
@@ -56,13 +60,14 @@ rm -rf Dockerfile entrypoint
 ....
 
 ##
-# Make the cluster apache and floating ip resources
+#
 ##
 target=$PHD_ENV_nodes1
 ....
+to="centos:custom_dummy"
 
-pcs resource create fake-container docker run_cmd="/usr/sbin/pacemaker_remoted"
-pcs resource create FAKE Dummy container=fake-container
+pcs resource create fake-container docker run_opts="-P -p 80:80 -p 127.0.0.1:10001:3121 -v /etc/pacemaker:/etc/pacemaker" run_cmd="/usr/sbin/pacemaker_remoted" image="${to}" meta remote-node=fake-node remote-port=10001 remote-addr=127.0.0.1
+pcs resource create fake-rsc Dummy meta container=fake-container
 
 phd_rsc_verify_start_all 60
 ....

@@ -43,6 +43,8 @@ cts_iterations=""
 doc_opts=""
 debug_container=0
 rpmdir=""
+stonith=0
+containers="2"
 
 function helptext() {
 	echo "pcmk_docker_autogen - A tool for generating pacemaker clusters locally with docker containers."
@@ -59,6 +61,7 @@ function helptext() {
 	echo "-p, --pull           Force pull \"from\" image regardless if it exists or not."
 	echo "-r, --reuse-image    Reuse image built from previous cluster if previous image is detected."
 	echo "-R, --rpm-copy       Copy rpms in this directory to image for install".
+	echo "-s, --stonith-tests  Execute stonith regression tests. Overrides containers option to 1"
 	echo ""
 	exit $1
 }
@@ -75,6 +78,7 @@ while true ; do
 	-p|--pull) pull=1; shift;;
 	-r|--reuse) reuse=1; shift;;
 	-R|--rpm-copy) rpmdir=$2; shift; shift;;
+	-s|--stonith-tests) stonith=1; containers=1; shift;;
 	"") break;;
 	*) 
 		echo "unknown option $1"
@@ -82,14 +86,26 @@ while true ; do
 	esac
 done
 
+if [ $stonith -ne 0 ] && [ -n "$cts_iterations" ]; then
+	echo "Specify either -s or -i, both can not be run at the same time"
+	exit 1
+fi
+
 # We have to re-launch docker with tcp ports open.
 docker_setup
 prev_cluster_cleanup
 make_image
 launch_containers
-launch_pcmk_all
-if [ -n "$cts_iterations" ]; then
-	launch_cts $cts_iterations
+if [ $stonith -eq 0 ]; then
+	launch_pcmk_all
 fi
 
-echo "DONE"
+if [ -n "$cts_iterations" ]; then
+	launch_cts $cts_iterations
+elif [ "$stonith" -ne 0 ]; then
+	launch_stonith_tests
+fi
+rc=$?
+
+echo "DONE exit code $rc"
+exit $rc
