@@ -44,7 +44,7 @@ doc_opts=""
 debug_container=0
 rpmdir=""
 stonith=0
-containers="2"
+containers="3"
 
 function helptext() {
 	echo "pcmk_docker_autogen - A tool for generating pacemaker clusters locally with docker containers."
