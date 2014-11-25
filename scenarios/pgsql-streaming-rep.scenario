@@ -1,0 +1,130 @@
+# master/slave pgres with streaming replication.
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs postgresql-server
+cluster_init=1
+floating_ips=2
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# make sure systemd isn't in the way here
+##
+target=all
+....
+systemctl stop postgresql
+systemctl disable postgresql
+
+su - postgres -c "pg_ctl -D /var/lib/pgsql/data stop"
+exit 0
+....
+
+##
+# setup master
+##
+target=$PHD_ENV_nodes1
+....
+su - postgres -c "rm -rf /var/lib/pgsql/data/*"
+su - postgres -c "rm -rf /var/lib/pgsql/pg_archive/*"
+su - postgres -c "mkdir /var/lib/pgsql/pg_archive"
+su - postgres -c "mkdir /var/lib/pgsql/data"
+su - postgres -c "cd /var/lib/pgsql/data && initdb"
+
+su - postgres -c "mv /var/lib/pgsql/data/postgresql.conf /var/lib/pgsql/data/postgresql.conf.bu"
+
+su - postgres -c "cat << END >> /var/lib/pgsql/data/postgresql.conf
+listen_addresses = '*'
+wal_level = hot_standby
+synchronous_commit = on
+archive_mode = on
+archive_command = 'cp %p /var/lib/pgsql/pg_archive/%f'
+max_wal_senders=5
+wal_keep_segments = 32
+hot_standby = on
+restart_after_crash = off
+replication_timeout = 5000
+wal_receiver_status_interval = 2
+max_standby_streaming_delay = -1
+max_standby_archive_delay = -1
+synchronous_commit = on
+restart_after_crash = off
+hot_standby_feedback = on
+END"
+
+#TODO do not hard code this address range
+su - postgres -c "echo 'host    all             all     192.168.122.0/24      trust' >> /var/lib/pgsql/data/pg_hba.conf"
+su - postgres -c "echo 'host    replication     all     192.168.122.0/24      trust' >> /var/lib/pgsql/data/pg_hba.conf"
+
+echo "starting server"
+su postgres -c "pg_ctl -D /var/lib/pgsql/data start"
+rc=$?
+echo "done rc=$rc"
+exit $rc
+....
+
+##
+# setup slave
+##
+target=$PHD_ENV_nodes2
+....
+su - postgres -c "rm -rf /var/lib/pgsql/data/*"
+su - postgres -c "pg_basebackup -h $PHD_ENV_nodes1 -U postgres -D /var/lib/pgsql/data -X stream -P"
+su - postgres -c "mkdir /var/lib/pgsql/pg_archive"
+
+su - postgres -c "cat << END >> /var/lib/pgsql/data/recovery.conf
+standby_mode = 'on'
+primary_conninfo = 'host=$PHD_ENV_nodes1 port=5432 user=postgres application_name=$PHD_ENV_nodes2'
+restore_command = 'cp /var/lib/pgsql/pg_archive/%f %p'
+recovery_target_timeline = 'latest'
+END"
+
+echo "starting server"
+su  postgres -c "pg_ctl -D /var/lib/pgsql/data/ start"
+rc=$?
+echo "done rc=$rc"
+exit $rc
+....
+
+##
+# stop db on all
+##
+target=all
+....
+su - postgres -c "pg_ctl -D /var/lib/pgsql/data stop"
+....
+
+##
+# add resources
+##
+target=$PHD_ENV_nodes1
+....
+rm -f pgsql_cfg
+pcs cluster cib pgsql_cfg
+
+pcs -f pgsql_cfg resource defaults resource-stickiness="100"
+pcs -f pgsql_cfg resource defaults migration-threshold="1"
+
+# in reality, these two addresses should be mapped to separate nics
+pcs -f pgsql_cfg resource create vip-master IPaddr2 ip="$PHD_ENV_floating_ips1" cidr_netmask="24"
+pcs -f pgsql_cfg resource create vip-rep IPaddr2 ip="$PHD_ENV_floating_ips2" cidr_netmask="24"
+
+pcs -f pgsql_cfg resource create pgsql pgsql rep_mode="sync" node_list="$PHD_ENV_nodes" restore_command="cp /var/lib/pgsql/pg_archive/%f %p" primary_conninfo_opt="keepalives_idle=60 keepalives_interval=5 keepalives_count=5" master_ip="$PHD_ENV_floating_ips2" restart_on_promote='true' 
+
+pcs -f pgsql_cfg resource master msPostgresql pgsql master-max=1 master-node-max=1 clone-max=2 clone-node-max=1 notify=true
+pcs -f pgsql_cfg resource group add master-group vip-master vip-rep
+
+pcs -f pgsql_cfg constraint colocation add master-group with Master msPostgresql INFINITY
+pcs -f pgsql_cfg constraint order promote msPostgresql then start master-group symmetrical=false score=INFINITY
+pcs -f pgsql_cfg constraint order demote  msPostgresql then stop  master-group symmetrical=false score=0
+
+pcs cluster cib-push pgsql_cfg
+phd_rsc_verify_start_all 160
+....
+
