@@ -63,10 +63,7 @@ su - postgres -c "echo 'host    all             all     192.168.122.0/24      tr
 su - postgres -c "echo 'host    replication     all     192.168.122.0/24      trust' >> /var/lib/pgsql/data/pg_hba.conf"
 
 echo "starting server"
-su postgres -c "pg_ctl -D /var/lib/pgsql/data start"
-rc=$?
-echo "done rc=$rc"
-exit $rc
+su postgres -c "pg_ctl -D /var/lib/pgsql/data start" &
 ....
 
 ##
@@ -86,10 +83,7 @@ recovery_target_timeline = 'latest'
 END"
 
 echo "starting server"
-su  postgres -c "pg_ctl -D /var/lib/pgsql/data/ start"
-rc=$?
-echo "done rc=$rc"
-exit $rc
+su  postgres -c "pg_ctl -D /var/lib/pgsql/data/ start" &
 ....
 
 ##
@@ -97,6 +91,7 @@ exit $rc
 ##
 target=all
 ....
+sleep 10
 su - postgres -c "pg_ctl -D /var/lib/pgsql/data stop"
 ....
 
