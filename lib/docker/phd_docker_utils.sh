@@ -408,6 +408,9 @@ launch_containers()
 		exec_cmd 'cat /etc/corosync/corosync.conf | sed "s/to_syslog:.*yes/to_logfile: yes\\nlogfile: \\/var\\/log\\/pacemaker.log/g" > /etc/corosync/corosync.conf.bu' "$name"
 		exec_cmd "mv -f /etc/corosync/corosync.conf.bu /etc/corosync/corosync.conf" "$name"
 		write_helper_scripts $c
+		exec_cmd "mkdir -p /etc/pacemaker/" "$name"
+		exec_cmd "echo \"this is a pretty insecure key\" > /etc/pacemaker/authkey" "$name"
+
 	done
 
 }
