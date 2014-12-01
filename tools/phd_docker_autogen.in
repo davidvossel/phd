@@ -45,6 +45,7 @@ debug_container=0
 rpmdir=""
 stonith=0
 containers="3"
+remote_containers="0"
 
 function helptext() {
 	echo "pcmk_docker_autogen - A tool for generating pacemaker clusters locally with docker containers."
@@ -52,16 +53,17 @@ function helptext() {
 	echo "Usage: pcmk_docker_autogen.sh [options]"
 	echo ""
 	echo "Options:"
-	echo "-c, --containers     Specify the number of containers to generate, defaults to $containers."
-	echo "-d, --cleanup-only   Cleanup previous containers only."
-	echo "-D, --debug-mode     Launch a container in interactive mode for testing."
-	echo "-f, --from           Specify the FROM image to base the docker containers off of. Default is \"$from\""
-	echo "-i, --cts-iterations The number of cts iterations to execute  on the newly created docker containers"
-	echo "-o, --repo-copy      Copy the repos in this host directory into the image's /etc/yum.repos.d/ directory"
-	echo "-p, --pull           Force pull \"from\" image regardless if it exists or not."
-	echo "-r, --reuse-image    Reuse image built from previous cluster if previous image is detected."
-	echo "-R, --rpm-copy       Copy rpms in this directory to image for install".
-	echo "-s, --stonith-tests  Execute stonith regression tests. Overrides containers option to 1"
+	echo "-c, --containers         Specify the number of pacemaker containers to generate, defaults to $containers."
+	echo "-b, --remote-containers  Specify the number of baremetal remote node containers to generate, defaults to $remote_containers."
+	echo "-d, --cleanup-only       Cleanup previous containers only."
+	echo "-D, --debug-mode         Launch a container in interactive mode for testing."
+	echo "-f, --from               Specify the FROM image to base the docker containers off of. Default is \"$from\""
+	echo "-i, --cts-iterations     The number of cts iterations to execute  on the newly created docker containers"
+	echo "-o, --repo-copy          Copy the repos in this host directory into the image's /etc/yum.repos.d/ directory"
+	echo "-p, --pull               Force pull \"from\" image regardless if it exists or not."
+	echo "-r, --reuse-image        Reuse image built from previous cluster if previous image is detected."
+	echo "-R, --rpm-copy           Copy rpms in this directory to image for install".
+	echo "-s, --stonith-tests      Execute stonith regression tests. Overrides containers option to 1"
 	echo ""
 	exit $1
 }
@@ -70,6 +72,7 @@ while true ; do
 	case "$1" in
 	--help|-h|-\?) helptext 0;;
 	-c|--containers) containers="$2"; shift; shift;;
+	-b|--remote-containers) remote_containers="$2"; shift; shift;;
 	-d|--cleanup-only) prev_cluster_cleanup; exit 0;;
 	-D|--debug-mode) debug_container=1; shift;;
 	-f|--from) from="$2"; shift; shift;;
@@ -96,14 +99,18 @@ docker_setup
 prev_cluster_cleanup
 make_image
 launch_containers
+launch_remote_containers
 if [ $stonith -eq 0 ]; then
 	launch_pcmk_all
+	launch_pcmk_remote_all
 fi
 
 if [ -n "$cts_iterations" ]; then
 	launch_cts $cts_iterations
 elif [ "$stonith" -ne 0 ]; then
 	launch_stonith_tests
+elif [ "$remote_containers" -ne 0 ]; then
+	integrate_remote_containers
 fi
 rc=$?
 

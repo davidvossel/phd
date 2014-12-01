@@ -26,9 +26,11 @@
 
 iprange="172.17.0."
 pcmkiprange="172.17.200."
+remoteiprange="172.17.201."
 gateway="172.17.42.1"
 pcmklogs="/var/log/pacemaker.log"
-nodeprefix="docker"
+cluster_nodeprefix="pcmk"
+remote_nodeprefix="pcmk_remote"
 
 if [ -z "$PHD_DOCKER_LIB" ]; then
 	PHD_DOCKER_LIB="/usr/libexec/phd/docker"
@@ -106,9 +108,11 @@ docker_setup()
 prev_cluster_cleanup()
 {
 	echo "Cleaning up previous pacemaker docker clusters"
-	prev_image=$(docker $doc_opts ps -a | grep ${nodeprefix}  | awk '{print $2}' | uniq)
-	docker $doc_opts stop $(docker $doc_opts ps -a | grep ${nodeprefix} | awk '{print $1}') > /dev/null 2>&1
-	docker $doc_opts rm $(docker $doc_opts ps -a | grep ${nodeprefix} | awk '{print $1}') > /dev/null 2>&1
+	prev_image=$(docker $doc_opts ps -a | grep ${cluster_nodeprefix}  | awk '{print $2}' | uniq)
+	docker $doc_opts stop $(docker $doc_opts ps -a | grep ${cluster_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
+	docker $doc_opts stop $(docker $doc_opts ps -a | grep ${remote_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
+	docker $doc_opts rm $(docker $doc_opts ps -a | grep ${remote_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
+	docker $doc_opts rm $(docker $doc_opts ps -a | grep ${cluster_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
 	if [ $reuse -eq 0 ]; then
 		docker $doc_opts rmi $prev_image > /dev/null 2>&1
 	fi
@@ -186,14 +190,14 @@ END
 
 write_helper_scripts()
 {
-	local index=$1
-	local name="${nodeprefix}${index}"
+	local node=$1
+	local ip=$2
 	local tmp
 
 	tmp=$(mktemp)
 	cat << END >> $tmp
 #!/bin/bash
-export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=${pcmkiprange}$index OCF_RESKEY_cidr_netmask=32
+export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=$ip OCF_RESKEY_cidr_netmask=32
 /usr/lib/ocf/resource.d/heartbeat/IPaddr2 start
 END
 	chmod 755 $tmp
@@ -347,12 +351,15 @@ END
 	chmod 755 $tmp
 	cp_cmd $tmp /usr/sbin/pcmk_remote_stop $node
 	rm -f $tmp
+
+	exec_cmd "mkdir -p /etc/pacemaker/" "$node"
+	exec_cmd "echo \"this is a pretty insecure key\" > /etc/pacemaker/authkey" "$node"
 }
 
 launch_pcmk()
 {
 	local index=$1
-	local name="${nodeprefix}${index}"
+	local name="${cluster_nodeprefix}${index}"
 
 	verify_connection "$name"
 	exec_cmd "pcmk_start" "$name"
@@ -366,15 +373,48 @@ launch_pcmk_all()
 	done
 }
 
+launch_pcmk_remote()
+{
+	local index=$1
+	local name="${remote_nodeprefix}${index}"
+
+	verify_connection "$name"
+	exec_cmd "pcmk_remote_start" "$name"
+}
+
+launch_pcmk_remote_all()
+{
+	for (( c=1; c <= $remote_containers; c++ ))
+	do
+		launch_pcmk_remote $c
+	done
+}
+
+launch_remote_containers()
+{
+	echo "Launching baremetal remote containers"
+
+	for (( c=1; c <= $remote_containers; c++ ))
+	do
+		name="${remote_nodeprefix}${c}"
+		echo "Launching remote node $name"
+
+		docker $doc_opts run -d -P -h $name --name=$name $image /bin/bash
+		verify_connection "$name"
+		write_helper_scripts "$name" "${remoteiprange}${c}"
+	done
+}
+
 launch_containers()
 {
 	echo "Launching containers"
 
 	local node_ips=""
+	local ip=""
 
 	for (( c=1; c <= $containers; c++ ))
 	do
-		name="${nodeprefix}${c}"
+		name="${cluster_nodeprefix}${c}"
 		echo "Launching node $name"
 
 		if [ $debug_container -eq 0 ]; then
@@ -396,7 +436,8 @@ launch_containers()
 
 	for (( c=1; c <= $containers; c++ ))
 	do
-		name="${nodeprefix}${c}"
+		name="${cluster_nodeprefix}${c}"
+		ip="${pcmkiprange}$c"
 
 		verify_connection "$name"
 		echo "setting up cluster"
@@ -407,25 +448,22 @@ launch_containers()
 		# make sure we use file based logging 
 		exec_cmd 'cat /etc/corosync/corosync.conf | sed "s/to_syslog:.*yes/to_logfile: yes\\nlogfile: \\/var\\/log\\/pacemaker.log/g" > /etc/corosync/corosync.conf.bu' "$name"
 		exec_cmd "mv -f /etc/corosync/corosync.conf.bu /etc/corosync/corosync.conf" "$name"
-		write_helper_scripts $c
-		exec_cmd "mkdir -p /etc/pacemaker/" "$name"
-		exec_cmd "echo \"this is a pretty insecure key\" > /etc/pacemaker/authkey" "$name"
+		write_helper_scripts "$name" "$ip"
 
 	done
 
 }
 
-kill_cts_daemons()
+kill_helper_daemons()
 {
 	killall -9 fence_docker_daemon > /dev/null 2>&1
 	killall -9 phd_docker_remote_daemon > /dev/null 2>&1
 }
 
 
-launch_cts_daemons()
+launch_helper_daemons()
 {
-	kill_cts_daemons
-
+	kill_helper_daemons
 
 	rm -f ${PHD_DOCKER_LOGDIR}/fence_docker_daemon.log
 	rm -f ${PHD_DOCKER_LOGDIR}/phd_docker_remote_daemon.log
@@ -446,22 +484,48 @@ launch_cts()
 	for (( c=1; c <= $containers; c++ ))
 	do
 		if [ -z "$nodes" ]; then
-			nodes="${nodeprefix}${c}"
+			nodes="${cluster_nodeprefix}${c}"
 		else
-			nodes="${nodes} ${nodeprefix}${c}"
+			nodes="${nodes} ${cluster_nodeprefix}${c}"
 		fi
 	done
 
-	launch_cts_daemons
-	/usr/share/pacemaker/tests/cts/CTSlab.py --docker --logfile $pcmklogs --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "docker" -c --test-ip-base "${iprange}200" --stack "mcp" --at-boot 0 $iterations
+	launch_helper_daemons
+	/usr/share/pacemaker/tests/cts/CTSlab.py --docker --logfile $pcmklogs --outputfile /var/log/cts.log --nodes "$nodes" -r --stonith "docker" -c --test-ip-base "${pcmkiprange}200" --stack "mcp" --at-boot 0 $iterations
 	rc=$?
-	kill_cts_daemons
+	kill_helper_daemons
 	return $rc
 }
 
 launch_stonith_tests()
 {
-	local name="${nodeprefix}1"
+	local name="${cluster_nodeprefix}1"
 	exec_cmd "/usr/sbin/ip_start" "$name"
 	exec_cmd "/usr/share/pacemaker/tests/fencing/regression.py" "$name"
+}
+
+
+integrate_remote_containers()
+{
+	local cluster_node="${cluster_nodeprefix}1"	
+
+	while true; do
+		exec_cmd "cibadmin -Q > /dev/null 2>&1" "$cluster_node"
+		if [ $? -eq 0 ]; then
+			break;
+		fi
+		echo "waiting for cluster to initialize in order to integrate remote nodes"
+	done
+
+	launch_helper_daemons
+	exec_cmd "pcs stonith create shooter fence_docker_cts" "$cluster_node"
+
+	for (( c=1; c <= $remote_containers; c++ ))
+	do
+		name="${remote_nodeprefix}${c}"
+		exec_cmd "pcs resource create $name remote server=${remoteiprange}${c}" "$cluster_node"
+		echo "integrating remote node $name"
+
+	done
+
 }
