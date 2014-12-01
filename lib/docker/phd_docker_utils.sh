@@ -228,6 +228,30 @@ END
 	cp_cmd $tmp /usr/sbin/pcmk_start $node
 	rm -f $tmp
 
+	tmp=$(mktemp)
+	cat << END >> $tmp
+#!/bin/bash
+/usr/sbin/ip_start
+pid=\$(pidof pacemaker_remoted)
+if [ "\$?" -ne 0 ];  then
+	mkdir -p /var/run
+
+	export PCMK_debugfile=$pcmklogs
+	(pacemaker_remoted &) & > /dev/null 2>&1
+	sleep 5
+
+	pid=\$(pidof pacemaker_remoted)
+	if [ "\$?" -ne 0 ]; then
+		echo "startup of pacemaker failed"
+		exit 1
+	fi
+	echo "$pid" > /var/run/pacemaker_remoted.pid
+fi
+exit 0
+END
+	chmod 755 $tmp
+	cp_cmd $tmp /usr/sbin/pcmk_remote_start $node
+	rm -f $tmp
 
 	tmp=$(mktemp)
 	cat << END >> $tmp
@@ -279,7 +303,49 @@ exit 0
 END
 	chmod 755 $tmp
 	cp_cmd $tmp /usr/sbin/pcmk_stop $node
+	rm -f $tmp
 
+	tmp=$(mktemp)
+	cat << END >> $tmp
+#!/bin/bash
+status()
+{
+	pid=\$(pidof \$1 2>/dev/null)
+	rtrn=\$?
+	if [ \$rtrn -ne 0 ]; then
+		echo "\$1 is stopped"
+	else
+		echo "\$1 (pid \$pid) is running..."
+	fi
+	return \$rtrn
+}
+stop()
+{
+	desc="Pacemaker Remote"
+	prog=\$1
+	shutdown_prog=\$prog
+
+	if status \$shutdown_prog > /dev/null 2>&1; then
+	    kill -TERM \$(pidof \$prog) > /dev/null 2>&1
+
+	    while status \$prog > /dev/null 2>&1; do
+		sleep 1
+		echo -n "."
+	    done
+	else
+	    echo -n "\$desc is already stopped"
+	fi
+
+	rm -f /var/lock/subsystem/pacemaker
+	rm -f /var/run/\${prog}.pid
+	killall -q -9 'crmd stonithd attrd cib lrmd pacemakerd pacemaker_remoted'
+}
+
+stop "pacemaker_remoted"
+exit 0
+END
+	chmod 755 $tmp
+	cp_cmd $tmp /usr/sbin/pcmk_remote_stop $node
 	rm -f $tmp
 }
 
