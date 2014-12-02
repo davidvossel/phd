@@ -23,6 +23,8 @@ target=all
 systemctl stop mariadb
 systemctl disable mariadb
 
+setenforce 0
+
 rm -rf /var/lib/mysql/*
 ....
 
