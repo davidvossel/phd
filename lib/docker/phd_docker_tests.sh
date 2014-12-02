@@ -40,7 +40,7 @@ launch_stonith_tests()
 baremetal_verify_state()
 {
 	local offline=$1
-	local total_rsc=$(($fake_rsc_count + $remote_containers))
+	local total_rsc=$2
 	# we expect a certain number of nodes to be offline
 	# after those nodes are offline we expect all resources to be up
 
@@ -52,7 +52,7 @@ baremetal_verify_state()
 		local tmp
 
 		echo "Tries left... $tries"
-		sleep 1
+		sleep 5
 		output=$(exec_cmd "crm_mon --as-xml" "$cluster_node")
 		if [ $? -ne 0 ]; then
 			echo "no crm_mon --as-xml output, trying another node"
@@ -69,6 +69,13 @@ baremetal_verify_state()
 			continue
 		fi
 
+		tmp=$(echo "$output" | grep "node.*online=.false.*unclean=.false" | wc -l)
+		if [ "$tmp" -ne $offline ]; then
+			echo "waiting for $offline offline nodes to be marked clean, $tmp marked so far"
+			continue
+		fi
+
+
 		tmp=$(echo "$output" | grep "resource.*ocf.*.*active=.true.*failed=.false" | wc -l)
 		if [ "$tmp" -ne "${total_rsc}" ]; then
 			echo "waiting for $total_rsc resources to come online. $tmp up so far"
@@ -76,7 +83,8 @@ baremetal_verify_state()
 		fi
 		return 0
 	done
-	return 1
+	echo "Failed to verify state."
+	exit 1
 }
 
 baremetal_set_env()
@@ -99,11 +107,14 @@ baremetal_set_env()
 
 launch_baremetal_remote_tests()
 {
-	iter=$1
+	local total_rsc
+	local iter=$1
 
 	echo "Launching Baremetal Remote Node Stress Tests"
 	baremetal_set_env
-	baremetal_verify_state 0
+
+	total_rsc=$(($fake_rsc_count + $remote_containers))
+	baremetal_verify_state 0 $total_rsc
 
 	for (( c=1; c <= $iter; c++ ))
 	do
@@ -113,20 +124,24 @@ launch_baremetal_remote_tests()
 		if [ $node_type -eq 1 ]; then
 			index=$(( ($RANDOM % $remote_containers) + 1 ))
 			name=${remote_nodeprefix}$index
+			total_rsc=$((total_rsc - 1))
 		else
 			index=$(( ($RANDOM % $containers) + 1 ))
 			name=${cluster_nodeprefix}$index
 		fi
 		echo "killing node $name"
 		docker kill $name
-		baremetal_verify_state 1
+		baremetal_verify_state 1 $total_rsc
+		sleep 5
 		echo "bring node $name back online"
-		sleep 1
 		if [ $node_type -eq 1 ]; then
 			launch_pcmk_remote $index
+			total_rsc=$((total_rsc + 1))
+			# clear the failcount on the remote node
+			exec_cmd "crm_resource -C -r $name" "${cluster_nodeprefix}1"
 		else
 			launch_pcmk $index
 		fi
-		baremetal_verify_state 0
+		baremetal_verify_state 0 $total_rsc
 	done
 }

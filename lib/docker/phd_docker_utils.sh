@@ -489,7 +489,7 @@ integrate_remote_containers()
 	for (( c=1; c <= $remote_containers; c++ ))
 	do
 		name="${remote_nodeprefix}${c}"
-		exec_cmd "pcs resource create $name remote server=${remoteiprange}${c}" "$cluster_node"
+		exec_cmd "pcs resource create $name remote server=${remoteiprange}${c} op start timeout=10s" "$cluster_node"
 		echo "integrating remote node $name"
 
 	done
