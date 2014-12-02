@@ -109,10 +109,10 @@ prev_cluster_cleanup()
 {
 	echo "Cleaning up previous pacemaker docker clusters"
 	prev_image=$(docker $doc_opts ps -a | grep ${cluster_nodeprefix}  | awk '{print $2}' | uniq)
-	docker $doc_opts stop $(docker $doc_opts ps -a | grep ${cluster_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
-	docker $doc_opts stop $(docker $doc_opts ps -a | grep ${remote_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
-	docker $doc_opts rm $(docker $doc_opts ps -a | grep ${remote_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
+	docker $doc_opts kill $(docker $doc_opts ps -a | grep ${cluster_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
+	docker $doc_opts kill $(docker $doc_opts ps -a | grep ${remote_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
 	docker $doc_opts rm $(docker $doc_opts ps -a | grep ${cluster_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
+	docker $doc_opts rm $(docker $doc_opts ps -a | grep ${remote_nodeprefix} | awk '{print $1}') > /dev/null 2>&1
 	if [ $reuse -eq 0 ]; then
 		docker $doc_opts rmi $prev_image > /dev/null 2>&1
 	fi
