@@ -103,7 +103,7 @@ while [ 1 -eq 1 ]; do
 		;;
 
 	stop|off)
-		docker stop $node
+		docker kill $node
 		if [ $? -ne 0 ]; then
 			respond "fail" "$returnfile" "$srcnode" "$pid"
 		fi
@@ -111,10 +111,11 @@ while [ 1 -eq 1 ]; do
 		;;
 
 	restart|reboot)
-		docker stop $node
+		docker kill $node
 		if [ $? -ne 0 ]; then
 			respond "fail" "$returnfile" "$srcnode" "$pid"
 		fi
+		sleep 1
 		docker start $node
 		if [ $? -ne 0 ]; then
 			respond "fail" "$returnfile" "$srcnode" "$pid"

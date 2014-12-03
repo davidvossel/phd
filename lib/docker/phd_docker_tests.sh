@@ -121,6 +121,7 @@ launch_baremetal_remote_tests()
 		local node_type=$(( ($RANDOM % 2) + 1 ))
 		local name
 		local index
+		echo "============== ITERATION NUMBER $c OUT OF $iter ==============="
 		if [ $node_type -eq 1 ]; then
 			index=$(( ($RANDOM % $remote_containers) + 1 ))
 			name=${remote_nodeprefix}$index
