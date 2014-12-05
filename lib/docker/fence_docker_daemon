@@ -120,7 +120,13 @@ while [ 1 -eq 1 ]; do
 		if [ $? -ne 0 ]; then
 			respond "fail" "$returnfile" "$srcnode" "$pid"
 		fi
-		respond "success" "$returnfile" "$srcnode" "$pid"
+		res=$(docker inspect --format {{.State.Running}} $node)
+		if [ "$res" = "true" ]; then
+			respond "success" "$returnfile" "$srcnode" "$pid"
+		else
+			respond "fail" "$returnfile" "$srcnode" "$pid"
+		fi
+
 		;;
 
 	*)
