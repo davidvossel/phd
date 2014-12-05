@@ -39,17 +39,17 @@ launch_stonith_tests()
 
 baremetal_verify_state()
 {
-	local offline=$1
-	local total_rsc=$2
-	# we expect a certain number of nodes to be offline
-	# after those nodes are offline we expect all resources to be up
+	local total_rsc=$1
+	local offline=$2
 
-	echo "Verifying cluster state, expecting $offline nodes to be offline"
+	echo "Verifying cluster state, expecting [$offline] nodes to be offline"
 	for (( tries=120; tries > 0; tries--))
 	do
 		local cluster_node=${cluster_nodeprefix}$(( ($RANDOM % $containers) + 1 ))
 		local output
 		local tmp
+		local node
+		local wait_list=""
 
 		echo "Tries left... $tries"
 		sleep 5
@@ -59,22 +59,32 @@ baremetal_verify_state()
 			continue
 		fi
 
-		tmp=$(echo "$output" | grep "node.*online=.false" | wc -l)
-		if [ "$offline" -eq "0" ] && [ "$tmp" -ne "0" ]; then
-			echo "waiting for all nodes to come online"
-			continue
-		elif [ "$tmp" -ne $offline ]; then
-			# TODO check for nodes by name instead of just how many we expect. pass a node list in
-			echo "waiting for exactly $offline nodes to go down. $tmp down so far"
+		for node in $(echo $offline); do
+			echo "$output" | grep -q "node.*name=.${node}. .*online=.false.*unclean=.false"
+			if [ $? -ne 0 ]; then
+				wait_list="$wait_list $node"
+				continue
+			fi
+			tmp=$(docker inspect --format {{.State.Running}} $node)
+			if ! [ "$tmp" = "true" ]; then
+				wait_list="$wait_list $node"
+				echo "Waiting for node [$node] to reboot.  running=$tmp"
+				continue
+			fi
+		done
+
+		if [ -n "$wait_list" ]; then
+			echo "waiting for node[s] [${wait_list}] to go offline cleanly"
 			continue
 		fi
 
-		tmp=$(echo "$output" | grep "node.*online=.false.*unclean=.false" | wc -l)
-		if [ "$tmp" -ne $offline ]; then
-			echo "waiting for $offline offline nodes to be marked clean, $tmp marked so far"
-			continue
+		if [ -z "$offline" ]; then
+			echo "$output" | grep -q "node.*online=.false"
+			if [ $? -eq 0 ]; then
+				echo "waiting for all nodes to come online"
+				continue
+			fi
 		fi
-
 
 		tmp=$(echo "$output" | grep "resource.*ocf.*.*active=.true.*failed=.false" | wc -l)
 		if [ "$tmp" -ne "${total_rsc}" ]; then
@@ -114,7 +124,7 @@ launch_baremetal_remote_tests()
 	baremetal_set_env
 
 	total_rsc=$(($fake_rsc_count + $remote_containers))
-	baremetal_verify_state 0 $total_rsc
+	baremetal_verify_state $total_rsc 
 
 	for (( c=1; c <= $iter; c++ ))
 	do
@@ -132,7 +142,7 @@ launch_baremetal_remote_tests()
 		fi
 		echo "killing node $name"
 		docker kill $name
-		baremetal_verify_state 1 $total_rsc
+		baremetal_verify_state $total_rsc $name
 		sleep 5
 		echo "bring node $name back online"
 		if [ $node_type -eq 1 ]; then
@@ -143,6 +153,6 @@ launch_baremetal_remote_tests()
 		else
 			launch_pcmk $index
 		fi
-		baremetal_verify_state 0 $total_rsc
+		baremetal_verify_state $total_rsc
 	done
 }
