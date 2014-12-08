@@ -24,6 +24,8 @@
 #
 #######################################################################
 
+fence_count_file=/var/run/fence_docker_daemon.count
+
 function respond()
 {
 	string=$1
@@ -48,6 +50,16 @@ function respond()
 	echo "Return File: $write_file"
 	echo "$string" > $write_file
 	kill -9 $pid
+}
+
+increment_fence_count()
+{
+       local count=0
+       if [ -f "$fence_count_file" ]; then
+               count=$(cat $fence_count_file)
+       fi
+       count=$(($count + 1))
+       echo "$count" > $fence_count_file
 }
 
 
@@ -107,6 +119,7 @@ while [ 1 -eq 1 ]; do
 		if [ $? -ne 0 ]; then
 			respond "fail" "$returnfile" "$srcnode" "$pid"
 		fi
+		increment_fence_count
 		respond "success" "$returnfile" "$srcnode" "$pid"
 		;;
 
@@ -122,6 +135,7 @@ while [ 1 -eq 1 ]; do
 		fi
 		res=$(docker inspect --format {{.State.Running}} $node)
 		if [ "$res" = "true" ]; then
+			increment_fence_count
 			respond "success" "$returnfile" "$srcnode" "$pid"
 		else
 			respond "fail" "$returnfile" "$srcnode" "$pid"
