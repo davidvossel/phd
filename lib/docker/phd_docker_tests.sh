@@ -40,7 +40,8 @@ launch_stonith_tests()
 baremetal_verify_state()
 {
 	local total_rsc=$1
-	local offline=$2
+	local expected_fencing_actions=$2
+	local offline=$3
 
 	echo "Verifying cluster state, expecting [$offline] nodes to be offline"
 	for (( tries=120; tries > 0; tries--))
@@ -91,6 +92,14 @@ baremetal_verify_state()
 			echo "waiting for $total_rsc resources to come online. $tmp up so far"
 			continue
 		fi
+
+		fencing_count="$(cat /var/run/fence_docker_daemon.count)"
+		if [ -z "$fencing_count" ] && [ "$expected_fencing_actions" = "0" ]; then
+			: fall through
+		elif ! [ "$fencing_count" = "$expected_fencing_actions" ]; then
+			echo "Expected $expected_fencing_actions fencing actions, but got $fencing_count"
+			break
+		fi
 		return 0
 	done
 	echo "Failed to verify state."
@@ -124,7 +133,7 @@ launch_baremetal_remote_tests()
 	baremetal_set_env
 
 	total_rsc=$(($fake_rsc_count + $remote_containers))
-	baremetal_verify_state $total_rsc 
+	baremetal_verify_state $total_rsc 0
 
 	for (( c=1; c <= $iter; c++ ))
 	do
@@ -141,8 +150,10 @@ launch_baremetal_remote_tests()
 			name=${cluster_nodeprefix}$index
 		fi
 		echo "killing node $name"
+
 		docker kill $name
-		baremetal_verify_state $total_rsc $name
+		baremetal_verify_state $total_rsc 1 $name
+		rm -f /var/run/fence_docker_daemon.count
 		sleep 5
 		echo "bring node $name back online"
 		if [ $node_type -eq 1 ]; then
@@ -153,6 +164,6 @@ launch_baremetal_remote_tests()
 		else
 			launch_pcmk $index
 		fi
-		baremetal_verify_state $total_rsc
+		baremetal_verify_state $total_rsc 0
 	done
 }

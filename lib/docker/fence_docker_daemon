@@ -62,6 +62,7 @@ increment_fence_count()
        echo "$count" > $fence_count_file
 }
 
+echo "0" > $fence_count_file
 
 while [ 1 -eq 1 ]; do
 	sleep 1
