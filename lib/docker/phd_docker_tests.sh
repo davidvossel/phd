@@ -97,8 +97,7 @@ baremetal_verify_state()
 		if [ -z "$fencing_count" ] && [ "$expected_fencing_actions" = "0" ]; then
 			: fall through
 		elif ! [ "$fencing_count" = "$expected_fencing_actions" ]; then
-			echo "Expected $expected_fencing_actions fencing actions, but got $fencing_count"
-			break
+			echo "WARNING: Expected $expected_fencing_actions fencing actions, but got $fencing_count"
 		fi
 		return 0
 	done
