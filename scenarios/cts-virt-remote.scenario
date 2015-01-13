@@ -7,7 +7,7 @@
 nodes=3
 floating_ips=1
 install_local=1
-packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs resource-agents fence-virt fence-agents libvirt libvirt-daemon-lxc
+packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs resource-agents fence-virt fence-agents  systemd-python libvirt libvirt-daemon-driver-lxc libvirt-daemon libvirt-client
 cluster_init=1
 
 ######################
