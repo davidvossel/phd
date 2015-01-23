@@ -28,6 +28,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	nfs-complex.scenario	\
 	nfs-shared-clvmd.scenario	\
 	pgsql-streaming-rep.scenario	\
+	rabbitmq-cluster.scenario	\
 	remote-baremetal-basic.scenario	\
 	remote-container-basic.scenario	\
 	remote-container-50.scenario	\
