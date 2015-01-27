@@ -5,7 +5,7 @@
 #################################
 = REQUIREMENTS =
 nodes=2
-packages=pacemaker corosync pcs rabbitmq-server wget
+packages=pacemaker corosync pcs rabbitmq-server resource-agents
 cluster_init=1
 
 ######################
