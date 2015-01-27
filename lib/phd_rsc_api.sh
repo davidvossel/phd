@@ -54,6 +54,8 @@ phd_rsc_clear_failcounts()
 
 	for rsc in $(echo $rsc_list); do
 		phd_cmd_exec "crm_resource -C -r  $rsc"
+		phd_cmd_exec "pcs resource failcount reset $rsc"
+		
 	done
 }
 
@@ -479,6 +481,10 @@ phd_rsc_fail()
 	local node=$3
 
 	# TODO add non generic ways to fail resource
+	if [ "$rsc" = "rmq" ] || [ "$rsc" = "rmq-clone" ]; then
+		phd_cmd_exec "rabbitmqctl stop" "$fail_node"
+		return
+	fi
 
 	phd_cmd_exec "crm_resource -F -r $rsc -N $fail_node" "$node"
 }
@@ -506,17 +512,17 @@ phd_rsc_failure_recovery()
 		return 1
 	fi
 
-	phd_log LOG_INFO "Performing failure recovery. resource:$rsc node:$node"
+	phd_log LOG_INFO "Performing failure recovery. resource: $rsc node: $node"
 
 	# clear failcount
 	phd_cmd_exec "crm_resource -C -r  $rsc -N $cur_node"
 
 	# fail rsc
-	phd_rsc_fail "$rsc" "$cur_node" "$node"
+	phd_rsc_fail "$rsc" "$cur_node" "$cur_node"
 
 	# verify failcount increases
 	stop_time=$(date +%s)
-	phd_cmd_exec "pcs resource failcount show $rsc $cur_node | grep '$cur_node:.*[1-9]*'"
+	phd_cmd_exec "pcs resource failcount show $rsc $cur_node | grep $cur_node:.*[1-9]*"
 	while [ $? -ne 0 ]; do
 		lapse_sec=`expr $(date +%s) - $stop_time`
 		if [ $lapse_sec -ge $timeout ]; then
@@ -524,7 +530,7 @@ phd_rsc_failure_recovery()
 			return 1
 		fi
 		sleep 1
-		phd_cmd_exec "pcs resource failcount show $rsc $cur_node | grep '$cur_node:.*[1-9]*'"
+		phd_cmd_exec "pcs resource failcount show $rsc $cur_node | grep $cur_node:.*[1-9]*"
 	done
 
 	# verify rsc is active on that node again (shows resource recovered)
@@ -537,6 +543,9 @@ phd_rsc_failure_recovery()
 	phd_log LOG_INFO "Failure recovery complete for resource, ${rsc}. Clearing failcounts."
 	# clear failcount
 	phd_cmd_exec "crm_resource -C -r  $rsc -N $cur_node"
+	sleep 5
+	phd_cmd_exec "pcs resource failcount reset $rsc"
+
 	return 0
 }
 
