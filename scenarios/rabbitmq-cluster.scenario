@@ -1,10 +1,10 @@
-# ha rabbitmq on 3 nodes.
+# ha rabbitmq on at least 2 nodes.
 
 #################################
 # Scenario Requirements Section #
 #################################
 = REQUIREMENTS =
-nodes=3
+nodes=2
 packages=pacemaker corosync pcs rabbitmq-server wget
 cluster_init=1
 
@@ -14,6 +14,7 @@ cluster_init=1
 = SCRIPTS =
 
 ##
+# Disable rabbitmq systemd resource
 ##
 target=all
 ....
@@ -22,21 +23,9 @@ systemctl stop rabbitmq-server
 systemctl disable rabbitmq-server
 rabbitmqctl stop
 
-# remove this after selinux policy is fixed
-setenforce 0
-
 # setting the cookie this way is only done for testing purposes
 # don't actually do it this way.
 echo "DTAEMJVYHBEJSNFXLXXC" > /var/lib/rabbitmq/.erlang.cookie
-
-cd /usr/lib/ocf/resource.d/heartbeat
-rm -f rabbitmq-cluster
-# use upstream agent until this agent is officially in package
-wget https://raw.githubusercontent.com/davidvossel/resource-agents/rabbitmq-cluster/heartbeat/rabbitmq-cluster
-chmod 755 rabbitmq-cluster
-
-#so we can get selinux debug
-cp /dev/null /var/log/audit/audit.log
 ....
 
 ##
@@ -50,7 +39,6 @@ target=$PHD_ENV_nodes1
 # cat /etc/rabbitmq/rabbitmq.config | grep "cluster_nodes"
 # ^ if that returns something, the environment is wrong
 pcs resource create rmq rabbitmq-cluster set_policy='HA ^(?!amq\.).* {"ha-mode":"all"}' clone ordered=true
-
 
 phd_rsc_verify_start_all 160
 ....
