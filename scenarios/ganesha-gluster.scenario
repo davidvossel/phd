@@ -49,7 +49,7 @@ target=$PHD_ENV_nodes1
 xfs_create()
 {
 	dev=$1
-	mkfs.xfs -i size=512 $dev
+	mkfs.xfs -f -i size=512 $dev
 	if [ $? -ne 0 ]; then
 		echo "Failed to make xfs fs on dev, $dev"
 		exit 1
