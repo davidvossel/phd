@@ -1,4 +1,4 @@
-# samba using GFS2 filesystem on shared storage
+# samba using ext4 filesystem on shared storage
 
 #################################
 # Scenario Requirements Section #
