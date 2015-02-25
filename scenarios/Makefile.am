@@ -35,6 +35,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	remote-container-100.scenario	\
 	remote-container-200.scenario	\
 	samba-active-active.scenario	\
+	samba-active-passive.scenario	\
 	slapd-basic.scenario	\
 	unfencing.scenario	\
 	wipe-storage.scenario

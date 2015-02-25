@@ -1,0 +1,110 @@
+# samba using GFS2 filesystem on shared storage
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=3
+shared_storage=1
+fence_cmd=1
+floating_ips=1
+
+packages=pacemaker corosync pcs pacemaker resource-agents samba
+cluster_init=1
+clean_shared_storage=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+### TODO 
+# why do i have to set OpenGPGCheck = no in the file below
+# /etc/abrt/abrt-action-save-package-data.conf
+#
+# why can't I enable selinux?
+
+# mount -t cifs -o guest //192.168.122.222/public /root/sambatest/
+
+##
+# Make sure all samba services are disabled
+# setup samba configs
+##
+target=all
+....
+nodes=$PHD_ENV_nodes
+
+setenforce 0
+
+service smb stop
+service nmb stop
+service winbind stop
+
+systemctl disable smb
+systemctl disable nmb
+systemctl disable winbind
+
+cat << END > /etc/samba/smb.conf
+[global]
+netbios name = linuxserver
+workgroup = WORKGROUP
+server string = Public File Server
+security = user
+map to guest = bad user
+guest account = smbguest
+lock directory = /mnt/smbshare/private/locks/
+private directory = /mnt/smbshare/private/
+
+[public]
+path = /mnt/smbshare/public
+guest ok = yes
+read only = no
+END
+
+groupadd -g 581 smbguest
+adduser smbguest -g smbguest
+
+exit 0
+....
+
+##
+# Make the backend fs
+##
+target=$PHD_ENV_nodes1
+....
+
+dev=$PHD_ENV_shared_storage1
+
+mkfs.ext4 $dev
+if [ $? -ne 0 ]; then
+	echo "Failed to setup volume group"
+	exit 1
+fi
+
+mkdir /mnt/smbshare
+mount $dev /mnt/smbshare
+mkdir -p /mnt/smbshare/public
+chown smbguest:smbguest /mnt/smbshare/public
+chmod 755 /mnt/smbshare/public
+mkdir -p /mnt/smbshare/private/locks
+umount /mnt/smbshare
+....
+
+##
+# Make the filesystem resource
+##
+target=$PHD_ENV_nodes1
+....
+tmpfile=mktemp
+dev=$PHD_ENV_shared_storage1
+
+pcs resource create smb-share Filesystem device=${dev} directory=/mnt/smbshare fstype=ext4 --group smb-group
+pcs resource create samba lsb:smb --group smb-group
+pcs resource create winbind lsb:winbind --group smb-group
+pcs resource create nmb lsb:nmb --group smb-group
+pcs resource create samba-ip IPaddr2 ip=$PHD_ENV_floating_ips1 cidr_netmask=32 --group smb-group
+
+# Wait for all resources to start
+phd_rsc_verify_start_all 60
+....
+
