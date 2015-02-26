@@ -1,0 +1,39 @@
+# Example cluster redis
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs redis wget
+cluster_init=1
+floating_ips=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# make sure redis agent is installed
+##
+target=all
+....
+cd /usr/lib/ocf/resource.d/heartbeat/
+rm -f redis
+wget https://raw.githubusercontent.com/ClusterLabs/resource-agents/master/heartbeat/redis --no-check-certificate
+chmod 755 redis
+....
+
+##
+# create redis master slave instance.
+##
+#
+target=$PHD_ENV_nodes1
+....
+pcs resource create redis redis config=/etc/redis.conf --master
+
+phd_rsc_verify_start_all 60
+....
+
+## TODO redis floating ip.
