@@ -484,6 +484,9 @@ phd_rsc_fail()
 	if [ "$rsc" = "rmq" ] || [ "$rsc" = "rmq-clone" ]; then
 		phd_cmd_exec "rabbitmqctl stop" "$fail_node"
 		return
+	elif [ "$rsc" = "redis" ] || [ "$rsc" = "redis-master" ]; then
+		phd_cmd_exec "killall -9 redis-server" "$fail_node"
+		return
 	fi
 
 	phd_cmd_exec "crm_resource -F -r $rsc -N $fail_node" "$node"
