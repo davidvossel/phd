@@ -21,7 +21,7 @@ target=all
 ....
 cd /usr/lib/ocf/resource.d/heartbeat/
 rm -f redis
-wget https://raw.githubusercontent.com/ClusterLabs/resource-agents/master/heartbeat/redis --no-check-certificate
+wget https://raw.githubusercontent.com/davidvossel/resource-agents/master/heartbeat/redis --no-check-certificate
 chmod 755 redis
 ....
 
@@ -31,7 +31,7 @@ chmod 755 redis
 #
 target=$PHD_ENV_nodes1
 ....
-pcs resource create redis redis config=/etc/redis.conf --master
+pcs resource create redis redis --master
 
 phd_rsc_verify_start_all 60
 ....
