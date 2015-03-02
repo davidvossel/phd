@@ -27,6 +27,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	nfs-basic.scenario	\
 	nfs-complex.scenario	\
 	nfs-shared-clvmd.scenario	\
+	nginx-basic.scenario	\
 	pgsql-streaming-rep.scenario	\
 	rabbitmq-cluster.scenario	\
 	redis-active-passive.scenario	\
