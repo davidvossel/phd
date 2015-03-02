@@ -19,6 +19,10 @@ floating_ips=1
 ##
 target=all
 ....
+
+# TODO, make sure to comment out bindaddr in redis.conf
+
+
 cd /usr/lib/ocf/resource.d/heartbeat/
 rm -f redis
 wget https://raw.githubusercontent.com/davidvossel/resource-agents/master/heartbeat/redis --no-check-certificate
@@ -31,7 +35,7 @@ chmod 755 redis
 #
 target=$PHD_ENV_nodes1
 ....
-pcs resource create redis redis --master
+pcs resource create redis redis --master meta notify=true
 
 phd_rsc_verify_start_all 60
 ....
