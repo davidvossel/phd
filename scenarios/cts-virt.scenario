@@ -6,8 +6,8 @@
 = REQUIREMENTS =
 nodes=3
 floating_ips=1
-install_local=1
-packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs resource-agents fence-virt fence-agents
+#install_local=1
+packages=pacemaker pacemaker-remote pacemaker-cts corosync pcs resource-agents fence-virt fence-agents systemd-python 
 cluster_init=1
 
 ######################

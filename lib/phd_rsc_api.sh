@@ -519,6 +519,7 @@ phd_rsc_failure_recovery()
 
 	# clear failcount
 	phd_cmd_exec "crm_resource -C -r  $rsc -N $cur_node"
+	sleep 5
 
 	# fail rsc
 	phd_rsc_fail "$rsc" "$cur_node" "$cur_node"

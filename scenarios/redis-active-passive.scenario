@@ -5,7 +5,7 @@
 #################################
 = REQUIREMENTS =
 nodes=2
-packages=pacemaker corosync pcs redis wget
+packages=pacemaker corosync pcs wget redis
 cluster_init=1
 floating_ips=1
 
@@ -35,7 +35,7 @@ chmod 755 redis
 #
 target=$PHD_ENV_nodes1
 ....
-pcs resource create redis redis --master meta notify=true
+pcs resource create redis redis wait_last_known_master=true --master meta notify=true ordered=true interleave=true
 
 phd_rsc_verify_start_all 60
 ....
