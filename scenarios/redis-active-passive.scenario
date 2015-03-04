@@ -25,7 +25,7 @@ target=all
 
 cd /usr/lib/ocf/resource.d/heartbeat/
 rm -f redis
-wget https://raw.githubusercontent.com/davidvossel/resource-agents/master/heartbeat/redis --no-check-certificate
+wget https://raw.githubusercontent.com/davidvossel/resource-agents/redis-cleanup/heartbeat/redis --no-check-certificate
 chmod 755 redis
 ....
 
