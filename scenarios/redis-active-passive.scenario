@@ -15,29 +15,43 @@ floating_ips=1
 = SCRIPTS =
 
 ##
-# make sure redis agent is installed
+# For testing, make sure bind address is set to default of "bind to all"
 ##
 target=all
 ....
+sed -i "s/\s*bind \(.*\)$/#bind \1/" /etc/redis.conf
 
-# TODO, make sure to comment out bindaddr in redis.conf
-
-
-cd /usr/lib/ocf/resource.d/heartbeat/
-rm -f redis
-wget https://raw.githubusercontent.com/davidvossel/resource-agents/redis-cleanup/heartbeat/redis --no-check-certificate
-chmod 755 redis
+# If redis fails to start, i've had to delete the db before on the
+# failed node to get it back up again.
+# rm -f /var/lib/redis/dump.rdb 
 ....
 
 ##
 # create redis master slave instance.
 ##
-#
 target=$PHD_ENV_nodes1
 ....
+# create redis master slave replication resource.
 pcs resource create redis redis wait_last_known_master=true --master meta notify=true ordered=true interleave=true
 
-phd_rsc_verify_start_all 60
+# create floating IP that follows master instance.
+pcs resource create vip-redis IPaddr2 ip=$PHD_ENV_floating_ips1
+pcs constraint order promote redis-master then start vip-redis
+pcs constraint colocation add vip-redis with master redis-master
 ....
 
-## TODO redis floating ip.
+##
+# Verify replication works.
+##
+target=$PHD_ENV_nodes1
+....
+phd_rsc_verify_start_all 60
+
+redis-cli -h $PHD_ENV_floating_ips1 info  | grep role:master
+phd_test_assert $? 0 "Failed to detect master instance on vip"
+
+redis-cli -h $PHD_ENV_floating_ips1 info  | grep connected_slaves:0
+phd_test_assert $? 1 "Failed to detect connected slaves."
+
+exit 0
+....
