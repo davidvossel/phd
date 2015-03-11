@@ -90,7 +90,7 @@ for node in $(echo $PHD_ENV_nodes); do
 done
 
 # Example: pcs resource create db galera enable_creation=true wsrep_cluster_address=gcomm://node1,node2,node3 meta master-max=3 --master
-pcs resource create db galera enable_creation=true wsrep_cluster_address=${gcomm} meta master-max=$(echo $PHD_ENV_nodes | wc -c) ordered=true op promote timeout=300s on-fail=block --master
+pcs resource create db galera additional_parameters="--open-files-limit=4098" enable_creation=true wsrep_cluster_address=${gcomm} meta master-max=$(echo $PHD_ENV_nodes | wc -c) ordered=true op promote timeout=300s on-fail=block --master
 
 phd_rsc_verify_start_all 160
 ....
