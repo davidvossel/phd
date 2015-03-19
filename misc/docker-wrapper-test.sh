@@ -61,7 +61,7 @@ docker_exec()
 	local rc
 
 	echo "---- Executing $cmd ----"
-	/usr/libexec/pacemaker/container_wrappers/docker-wrapper $cmd
+	/usr/lib/ocf/resource.d/lrmd_container_wrappers/docker-wrapper $cmd
 	rc=$?	
 
 	if [ $rc -ne $expected_rc ]; then
@@ -109,6 +109,28 @@ test_failure_detection()
 	docker_exec "stop" "0"
 }
 
+#TODO test, kill pid 1
+
+test_rsc_failure_detection()
+{
+	clear_vars
+	curtest="rsc_failure_detection"
+
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
+
+	docker_exec "monitor" "7"
+	docker_exec "start" "0"
+	docker_exec "monitor" "0"
+
+	echo "rm -f /var/run/resource-agents/Dummy-*" | nsenter --target $(docker inspect --format {{.State.Pid}} $container) --mount --uts --ipc --net --pid
+
+	docker_exec "monitor" "7"
+	docker_exec "stop" "0"
+	docker_exec "monitor" "7"
+	docker_exec "start" "0"
+	docker_exec "stop" "0"
+}
 
 test_multi_rsc()
 {
@@ -126,7 +148,6 @@ test_multi_rsc()
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
 	docker_exec "monitor" "0"
-
 
 	docker_exec "stop" "0"
 	val=$(docker inspect --format {{.State.Running}} $container 2>/dev/null)
@@ -153,7 +174,7 @@ test_super_multi_rsc()
 {
 	clear_vars
 	curtest="super_multi_rsc"
-	resources=5
+	resources=9
 
 	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
 	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
@@ -194,12 +215,73 @@ test_super_multi_rsc()
 }
 
 
+test_super_multi_rsc_failure()
+{
+	clear_vars
+	curtest="super_multi_rsc_failure"
+	local resources=9
+	local index
+
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
+
+	for (( c=1; c <= $resources; c++ ))
+	do
+		export OCF_RESOURCE_INSTANCE="test${c}"
+
+		docker_exec "monitor" "7"
+		docker_exec "start" "0"
+
+		fail_it=$(( $RANDOM % 2 ))
+		if [ $fail_it -eq 1 ]; then
+			echo "FAILING INDEX $c"
+			echo "rm -f /var/run/resource-agents/Dummy-test${c}.state" | nsenter --target $(docker inspect --format {{.State.Pid}} $container) --mount --uts --ipc --net --pid
+			docker_exec "monitor" "7"
+		fi
+	done
+
+	for (( c=1; c <= $resources; c++ ))
+	do
+		export OCF_RESOURCE_INSTANCE="test${c}"
+		/usr/lib/ocf/resource.d/lrmd_container_wrappers/docker-wrapper "monitor"
+		if [ $? -ne 0 ]; then
+			docker_exec "stop" "0"
+			docker_exec "monitor" "7"
+			docker_exec "start" "0"
+			docker_exec "monitor" "0"
+		fi
+	done
+
+	for (( c=1; c <= $resources; c++ ))
+	do
+		export OCF_RESOURCE_INSTANCE="test${c}"
+		docker_exec "monitor" "0"
+		docker_exec "stop" "0"
+
+		val=$(docker inspect --format {{.State.Running}} $container 2>/dev/null)
+		rc=$?
+		if [ $rc -ne 0 ] && [ $c -ne $resources ]; then
+			echo "FAILED: test $curtest: container shouldn't have stopped yet. resource $OCF_RESOURCE_INSTANCE stopped last"
+			exit 1
+		elif [ $rc -eq 0 ] && [ $c -eq $resources ]; then
+			echo "FAILED: test $curtest: container should be stopped now"
+			exit 1
+		fi
+		docker_exec "monitor" "7"
+	done
+
+}
+
+
 service docker start > /dev/null 2>&1
 build_image
 
 echo "STARTING TESTS: using image <$image> container name <$container>"
 
 test_simple
+echo "--------------- PASSED: $curtest"
+
+test_rsc_failure_detection
 echo "--------------- PASSED: $curtest"
 
 test_failure_detection
@@ -209,6 +291,9 @@ test_multi_rsc
 echo "--------------- PASSED: $curtest"
 
 test_super_multi_rsc
+echo "--------------- PASSED: $curtest"
+
+test_super_multi_rsc_failure
 echo "--------------- PASSED: $curtest"
 
 cleanup
