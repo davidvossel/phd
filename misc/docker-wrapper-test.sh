@@ -61,7 +61,7 @@ docker_exec()
 	local rc
 
 	echo "---- Executing $cmd ----"
-	/usr/lib/ocf/resource.d/lrmd_container_wrappers/docker-wrapper $cmd
+	/usr/lib/ocf/resource.d/containers/docker-wrapper $cmd
 	rc=$?	
 
 	if [ $rc -ne $expected_rc ]; then
@@ -77,8 +77,8 @@ test_simple()
 	clear_vars
 	curtest="simple"
 
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -95,8 +95,8 @@ test_failure_detection()
 	clear_vars
 	curtest="failure_detection"
 
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -116,8 +116,8 @@ test_rsc_failure_detection()
 	clear_vars
 	curtest="rsc_failure_detection"
 
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -137,8 +137,8 @@ test_multi_rsc()
 	clear_vars
 	curtest="multi_rsc"
 
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -176,8 +176,8 @@ test_super_multi_rsc()
 	curtest="super_multi_rsc"
 	resources=9
 
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
 
 	for (( c=1; c <= $resources; c++ ))
 	do
@@ -222,8 +222,8 @@ test_super_multi_rsc_failure()
 	local resources=9
 	local index
 
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_wrapper_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_docker_image="$image"  OCF_RESKEY_docker_privileged="true"
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
 
 	for (( c=1; c <= $resources; c++ ))
 	do
@@ -243,7 +243,7 @@ test_super_multi_rsc_failure()
 	for (( c=1; c <= $resources; c++ ))
 	do
 		export OCF_RESOURCE_INSTANCE="test${c}"
-		/usr/lib/ocf/resource.d/lrmd_container_wrappers/docker-wrapper "monitor"
+		/usr/lib/ocf/resource.d/containers/docker-wrapper "monitor"
 		if [ $? -ne 0 ]; then
 			docker_exec "stop" "0"
 			docker_exec "monitor" "7"
