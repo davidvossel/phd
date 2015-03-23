@@ -49,6 +49,10 @@ exit 0
 ##
 target=all
 ....
+mkdir -p /etc/pacemaker
+rm -f /etc/pacemaker/authkey
+echo "this is a pretty insecure key, but at least it is predictable" > /etc/pacemaker/authkey
+
 echo "Checking to make sure fence_xvm has a valid key on cluster nodes"
 ls /etc/cluster/fence_xvm.key
 ....
