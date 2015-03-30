@@ -4,6 +4,7 @@ container="hatest"
 baseimage="centos:centos7"
 image="centos:dock-wrapper-test"
 curtest="unknown"
+rpmdir="$1"
 
 clear_vars()
 {
@@ -21,6 +22,7 @@ clear_vars()
 
 cleanup()
 {
+	rm -rf rpms
 	docker kill $container > /dev/null 2>&1
 	docker rm $container > /dev/null 2>&1
 }
@@ -42,7 +44,15 @@ build_image()
 
 	# Create Dockerfile for image creation.
 	echo "FROM $from" > Dockerfile
-	echo "RUN yum install -y resource-agents pacemaker-remote pacemaker" >> Dockerfile
+	rm -rf rpms
+	mkdir rpms
+	if [ -n "$rpmdir" ]; then
+		echo "ADD /rpms /root/" >> Dockerfile
+		echo "RUN yum install -y /root/*.rpm" >> Dockerfile
+		cp $rpmdir/* rpms/
+	else
+		echo "RUN yum install -y resource-agents pacemaker-remote pacemaker" >> Dockerfile
+	fi
 
 	docker build -t "$to" .
 	if [ $? -ne 0 ]; then
@@ -60,9 +70,22 @@ docker_exec()
 	local expected_rc=$2
 	local rc
 
-	echo "---- Executing $cmd ----"
+	echo "---- Executing $cmd of test $curtest ----"
 	/usr/lib/ocf/resource.d/containers/docker-wrapper $cmd
 	rc=$?	
+
+	if [ "$cmd" = "start" ]; then
+		local portcheck=0
+		docker port $CONTAINER 3121 > /dev/null 2>&1
+		portcheck=$?
+		if [ "$portcheck" -ne "0" ] && [ -n "$OCF_RESKEY_pcmk_docker_privileged" ]; then
+			echo "FAILED: test $curtest: privileged enabled but port 3121 is not mapped."
+			exit 1
+		elif [ "$portcheck" -eq "0" ] && [ -z "$OCF_RESKEY_pcmk_docker_privileged" ]; then
+			echo "FAILED: test $curtest: privileged disabled but port 3121 is mapped."
+			exit 1
+		fi
+	fi
 
 	if [ $rc -ne $expected_rc ]; then
 		echo "FAILED: test $curtest: expected exit code $expected_rc, but got $rc"
@@ -78,7 +101,7 @@ test_simple()
 	curtest="simple"
 
 	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -96,7 +119,7 @@ test_failure_detection()
 	curtest="failure_detection"
 
 	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -117,7 +140,7 @@ test_rsc_failure_detection()
 	curtest="rsc_failure_detection"
 
 	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -138,7 +161,7 @@ test_multi_rsc()
 	curtest="multi_rsc"
 
 	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -177,7 +200,7 @@ test_super_multi_rsc()
 	resources=9
 
 	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	for (( c=1; c <= $resources; c++ ))
 	do
@@ -223,7 +246,7 @@ test_super_multi_rsc_failure()
 	local index
 
 	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"  OCF_RESKEY_pcmk_docker_privileged="true"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	for (( c=1; c <= $resources; c++ ))
 	do
@@ -273,28 +296,37 @@ test_super_multi_rsc_failure()
 }
 
 
+test_loop()
+{
+	test_simple
+	echo "PASSED: $curtest"
+
+	test_rsc_failure_detection
+	echo "PASSED: $curtest"
+
+	test_failure_detection
+	echo "PASSED: $curtest"
+
+	test_multi_rsc
+	echo "PASSED: $curtest"
+
+	test_super_multi_rsc
+	echo "PASSED: $curtest"
+
+	test_super_multi_rsc_failure
+	echo "PASSED: $curtest"
+}
+
+
 service docker start > /dev/null 2>&1
 build_image
-
 echo "STARTING TESTS: using image <$image> container name <$container>"
 
-test_simple
-echo "--------------- PASSED: $curtest"
+export OCF_RESKEY_pcmk_docker_privileged="true"
+test_loop
 
-test_rsc_failure_detection
-echo "--------------- PASSED: $curtest"
-
-test_failure_detection
-echo "--------------- PASSED: $curtest"
-
-test_multi_rsc
-echo "--------------- PASSED: $curtest"
-
-test_super_multi_rsc
-echo "--------------- PASSED: $curtest"
-
-test_super_multi_rsc_failure
-echo "--------------- PASSED: $curtest"
+unset OCF_RESKEY_pcmk_docker_privileged
+test_loop
 
 cleanup
 
