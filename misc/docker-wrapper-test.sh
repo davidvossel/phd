@@ -71,7 +71,7 @@ docker_exec()
 	local rc
 
 	echo "---- Executing $cmd of test $curtest ----"
-	/usr/lib/ocf/resource.d/containers/docker-wrapper $cmd
+	/usr/lib/ocf/resource.d/isolation/docker-wrapper $cmd
 	rc=$?	
 
 	if [ "$cmd" = "start" ]; then
@@ -266,7 +266,7 @@ test_super_multi_rsc_failure()
 	for (( c=1; c <= $resources; c++ ))
 	do
 		export OCF_RESOURCE_INSTANCE="test${c}"
-		/usr/lib/ocf/resource.d/containers/docker-wrapper "monitor"
+		/usr/lib/ocf/resource.d/isolation/docker-wrapper "monitor"
 		if [ $? -ne 0 ]; then
 			docker_exec "stop" "0"
 			docker_exec "monitor" "7"
@@ -328,6 +328,6 @@ test_loop
 unset OCF_RESKEY_pcmk_docker_privileged
 test_loop
 
-cleanup
+#cleanup
 
 echo "______ ALL TESTS PASSED ______"
