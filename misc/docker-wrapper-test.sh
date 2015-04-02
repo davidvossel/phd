@@ -15,9 +15,14 @@ clear_vars()
 		unset $tmp
 	done
 
-	export OCF_ROOT=/usr/lib/ocf
-
 	return 0
+}
+
+default_vars()
+{
+	export OCF_ROOT=/usr/lib/ocf
+	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
+	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 }
 
 cleanup()
@@ -74,9 +79,9 @@ docker_exec()
 	/usr/lib/ocf/resource.d/isolation/docker-wrapper $cmd
 	rc=$?	
 
-	if [ "$cmd" = "start" ]; then
+	if [ "$cmd" = "start" ] && [ $rc -eq 0 ]; then
 		local portcheck=0
-		docker port $CONTAINER 3121 > /dev/null 2>&1
+		docker port $container 3121 > /dev/null 2>&1
 		portcheck=$?
 		if [ "$portcheck" -ne "0" ] && [ -n "$OCF_RESKEY_pcmk_docker_privileged" ]; then
 			echo "FAILED: test $curtest: privileged enabled but port 3121 is not mapped."
@@ -97,12 +102,10 @@ docker_exec()
 
 test_simple()
 {
-	clear_vars
+	default_vars
 	curtest="simple"
 
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
-
+	docker_exec "stop" "0"
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
 	docker_exec "monitor" "0"
@@ -115,11 +118,8 @@ test_simple()
 
 test_failure_detection()
 {
-	clear_vars
+	default_vars
 	curtest="failure_detection"
-
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -132,15 +132,74 @@ test_failure_detection()
 	docker_exec "stop" "0"
 }
 
-#TODO test, kill pid 1
+
+test_failure_detection_pid1()
+{
+	default_vars
+	curtest="failure_detection_pid1"
+
+	docker_exec "monitor" "7"
+	docker_exec "start" "0"
+	docker_exec "monitor" "0"
+
+	# you can kill container process from host actually. kind of interesting
+	killall -9 pacemaker_remoted
+	killall -9 lrmd
+	docker_exec "monitor" "7"
+	docker_exec "stop" "0"
+}
+
+test_failure_invalid_image()
+{
+	default_vars
+	curtest="failure_invalid_image"
+
+	export OCF_RESKEY_pcmk_docker_image="manbearpig"
+
+	docker_exec "stop" "0"
+	docker_exec "monitor" "7"
+	docker_exec "start" "6"
+}
+
+#TODO verify more complex args make it to isolated resource correctly
+test_arg_passing()
+{
+	default_vars
+	curtest="arg_passing"
+
+	rm -rf /usr/lib/ocf/resource.d/wraptest
+	mkdir /usr/lib/ocf/resource.d/wraptest
+	echo "#!/bin/bash" > /usr/lib/ocf/resource.d/wraptest/WrapDummy
+	echo "printenv > /usr/lib/ocf/resource.d/wraptest/docker-wrap.dbug" >> /usr/lib/ocf/resource.d/wraptest/WrapDummy
+	echo "/usr/lib/ocf/resource.d/heartbeat/Dummy \$@"  >> /usr/lib/ocf/resource.d/wraptest/WrapDummy
+	chmod 755 /usr/lib/ocf/resource.d/wraptest/WrapDummy
+
+	export OCF_RESKEY_CRM_meta_provider="wraptest"
+	# try more complex args here. like ''' my arg ''' 
+	export OCF_RESKEY_myarg="'my va '"
+	export OCF_RESKEY_CRM_meta_type="WrapDummy"
+	export OCF_RESKEY_pcmk_docker_run_opts="-v /usr/lib/ocf/resource.d/wraptest:/usr/lib/ocf/resource.d/wraptest"
+
+	docker_exec "stop" "0"
+	docker_exec "start" "0"
+	docker_exec "monitor" "0"
+
+	cat /usr/lib/ocf/resource.d/wraptest/docker-wrap.dbug | grep "OCF_RESKEY_myarg=${OCF_RESKEY_myarg}"
+	if [ $? -ne 0 ]; then
+		echo "ERROR: arguments did not get passed to isolated instance"
+		exit 1
+	fi
+# var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.ID}} $container)/rootfs/tmp/docker-wrap.dbug
+
+
+	docker_exec "stop" "0"
+	docker_exec "monitor" "7"
+}
 
 test_rsc_failure_detection()
 {
-	clear_vars
+	default_vars
 	curtest="rsc_failure_detection"
-
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -157,11 +216,8 @@ test_rsc_failure_detection()
 
 test_multi_rsc()
 {
-	clear_vars
+	default_vars
 	curtest="multi_rsc"
-
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	docker_exec "monitor" "7"
 	docker_exec "start" "0"
@@ -195,12 +251,9 @@ test_multi_rsc()
 
 test_super_multi_rsc()
 {
-	clear_vars
+	default_vars
 	curtest="super_multi_rsc"
 	resources=9
-
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	for (( c=1; c <= $resources; c++ ))
 	do
@@ -240,13 +293,10 @@ test_super_multi_rsc()
 
 test_super_multi_rsc_failure()
 {
-	clear_vars
+	default_vars
 	curtest="super_multi_rsc_failure"
 	local resources=9
 	local index
-
-	export OCF_RESKEY_CRM_meta_provider="heartbeat" OCF_RESKEY_CRM_meta_class="ocf" OCF_RESKEY_CRM_meta_type="Dummy" OCF_RESKEY_CRM_meta_isolation_instance="$container"
-	export OCF_RESOURCE_INSTANCE="test" OCF_RESKEY_pcmk_docker_image="$image"
 
 	for (( c=1; c <= $resources; c++ ))
 	do
@@ -295,13 +345,21 @@ test_super_multi_rsc_failure()
 
 }
 
-
 test_loop()
 {
 	test_simple
 	echo "PASSED: $curtest"
 
 	test_rsc_failure_detection
+	echo "PASSED: $curtest"
+
+	test_failure_detection_pid1
+	echo "PASSED: $curtest"
+
+	test_failure_invalid_image
+	echo "PASSED: $curtest"
+
+	test_arg_passing
 	echo "PASSED: $curtest"
 
 	test_failure_detection
