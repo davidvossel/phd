@@ -176,7 +176,10 @@ test_arg_passing()
 
 	export OCF_RESKEY_CRM_meta_provider="wraptest"
 	# try more complex args here. like ''' my arg ''' 
-	export OCF_RESKEY_myarg="'my va '"
+	export OCF_RESKEY_myarg1='HA ^(?!amq\.).* {"ha-mode":"all"}'
+	export OCF_RESKEY_myarg2='$(ls)'
+	export OCF_RESKEY_myarg3='`ls`'
+	export OCF_RESKEY_myarg4="\$HOME"
 	export OCF_RESKEY_CRM_meta_type="WrapDummy"
 	export OCF_RESKEY_pcmk_docker_run_opts="-v /usr/lib/ocf/resource.d/wraptest:/usr/lib/ocf/resource.d/wraptest"
 
@@ -184,11 +187,36 @@ test_arg_passing()
 	docker_exec "start" "0"
 	docker_exec "monitor" "0"
 
-	cat /usr/lib/ocf/resource.d/wraptest/docker-wrap.dbug | grep "OCF_RESKEY_myarg=${OCF_RESKEY_myarg}"
-	if [ $? -ne 0 ]; then
-		echo "ERROR: arguments did not get passed to isolated instance"
+	cat /usr/lib/ocf/resource.d/wraptest/docker-wrap.dbug | grep "OCF"
+	myarg=$(cat /usr/lib/ocf/resource.d/wraptest/docker-wrap.dbug | grep "OCF_RESKEY_myarg1" | awk -F= '{print$2}')
+	echo "DID ARG PASS?  $myarg == $OCF_RESKEY_myarg1"
+	if ! [ "$myarg" = "$OCF_RESKEY_myarg1" ]; then
+		echo "ERROR: arguments [$OCF_RESKEY_myarg1]did not get passed to isolated instance"
 		exit 1
 	fi
+
+	myarg=$(cat /usr/lib/ocf/resource.d/wraptest/docker-wrap.dbug | grep "OCF_RESKEY_myarg2" | awk -F= '{print$2}')
+	echo "DID ARG PASS?  $myarg == $OCF_RESKEY_myarg2"
+	if ! [ "$myarg" = "$OCF_RESKEY_myarg2" ]; then
+		echo "ERROR: arguments [$OCF_RESKEY_myarg2]did not get passed to isolated instance"
+		exit 1
+	fi
+
+	myarg=$(cat /usr/lib/ocf/resource.d/wraptest/docker-wrap.dbug | grep "OCF_RESKEY_myarg3" | awk -F= '{print$2}')
+	echo "DID ARG PASS?  $myarg == $OCF_RESKEY_myarg3"
+	if ! [ "$myarg" = "$OCF_RESKEY_myarg3" ]; then
+		echo "ERROR: arguments [$OCF_RESKEY_myarg3]did not get passed to isolated instance"
+		exit 1
+	fi
+
+
+	myarg=$(cat /usr/lib/ocf/resource.d/wraptest/docker-wrap.dbug | grep "OCF_RESKEY_myarg4" | awk -F= '{print$2}')
+	echo "DID ARG PASS?  $myarg == $OCF_RESKEY_myarg4"
+	if ! [ "$myarg" = "$OCF_RESKEY_myarg4" ]; then
+		echo "ERROR: arguments [$OCF_RESKEY_myarg4]did not get passed to isolated instance"
+		exit 1
+	fi
+
 # var/lib/docker/devicemapper/mnt/$(docker inspect --format {{.ID}} $container)/rootfs/tmp/docker-wrap.dbug
 
 
