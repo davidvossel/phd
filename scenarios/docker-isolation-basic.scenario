@@ -1,0 +1,183 @@
+# Example docker container management scenario
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs docker
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# cleanup anything left over from previous run
+##
+target=all
+....
+# make sure docker services are up
+service docker start
+
+# clean up previous containers and images
+for item in $(docker ps -a | awk '{print $1}' | grep -v "CONTAINER"); do docker stop $item; docker rm $item; done
+docker rmi centos:isolation > /dev/null 2>&1
+rm -rf Dockerfile rpms
+....
+
+##
+# Make docker images on both nodes for apache.
+##
+target=all
+....
+from="centos:centos7"
+to="centos:isolation"
+
+docker pull "$from"
+if [ $? -ne 0 ]; then
+	echo "ERROR: failed to pull docker image $from"
+	exit 1
+fi
+
+# Create Dockerfile for image creation.
+echo "FROM $from" > Dockerfile
+if [ -d "/$HOME/phd_state/phd_scenario/phd_rpms" ]; then
+	rm -rf rpms
+	mkdir rpms
+	echo "ADD /rpms /root/" >> Dockerfile
+	echo "RUN yum install -y /root/*.rpm" >> Dockerfile
+	cp /$HOME/phd_state/phd_scenario/phd_rpms/* rpms/
+else
+	echo "RUN yum install -y pacemaker pacemaker-remote resource-agents" >> Dockerfile
+fi
+
+# build new image with apache in it from our base image.
+docker build -t "$to" .
+if [ $? -ne 0 ]; then
+	echo "ERROR: failed to generate docker image"
+	exit 1
+fi
+
+# cleanup
+rm -rf Dockerfile rpms
+....
+
+##
+# Make a simple isolated resource
+##
+target=$PHD_ENV_nodes1
+....
+# single isolated resource.
+pcs resource create single Dummy pcmk_docker_image=centos:isolation op start timeout=120s op stop timeout=90s --force
+
+rm -f clone.cib group_is_container.cib group_of_containers.cib master.cib
+phd_rsc_verify_start_all 60
+....
+
+##
+# Make more complex isolated resources
+##
+target=$PHD_ENV_nodes1
+....
+
+# clone isolated resources.
+cat << END >> clone.cib
+<clone id="replicated-clone">
+  <instance_attributes id="clone-instance_attributes">
+    <nvpair id="clone-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
+  </instance_attributes>
+  <primitive class="ocf" id="replicated" provider="heartbeat" type="Dummy">
+    <operations>
+        <op id="replicated-start-interval-0s" interval="0s" name="start" timeout="20"/>
+        <op id="replicated-stop-interval-0s" interval="0s" name="stop" timeout="20"/>
+        <op id="replicated-monitor-interval-10" interval="10" name="monitor" timeout="20"/>
+    </operations>
+  </primitive>
+    <meta_attributes id="replicated-clone-meta">
+    </meta_attributes>
+</clone>
+END
+cibadmin -o resources -Mc -x clone.cib
+
+# group is an isolated resource.
+cat << END >> group_is_container.cib
+<group id="group_is_container">
+  <instance_attributes id="group-is-instance_attributes">
+    <nvpair id="group-is-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
+  </instance_attributes>
+  <primitive class="ocf" id="s1" provider="heartbeat" type="Dummy">
+    <instance_attributes id="s1-instance_attributes"/>
+    <operations>
+        <op id="s1-start-interval-0s" interval="0s" name="start" timeout="120"/>
+        <op id="s1-stop-interval-0s" interval="0s" name="stop" timeout="90"/>
+        <op id="s1-monitor-interval-10" interval="10" name="monitor" timeout="20"/>
+    </operations>
+  </primitive>
+  <primitive class="ocf" id="s2" provider="heartbeat" type="Dummy">
+    <instance_attributes id="s2-instance_attributes"/>
+    <operations>
+        <op id="s2-start-interval-0s" interval="0s" name="start" timeout="20"/>
+        <op id="s2-stop-interval-0s" interval="0s" name="stop" timeout="20"/>
+        <op id="s2-monitor-interval-10" interval="10" name="monitor" timeout="20"/>
+    </operations>
+  </primitive>
+  <meta_attributes id="group_is_container-meta_attributes"/>
+</group>
+END
+cibadmin -o resources -Mc -x group_is_container.cib
+
+# group of isolated resources
+cat << END >> group_of_containers.cib
+<group id="group_of_containers">
+  <primitive class="ocf" id="iso_mem1" provider="heartbeat" type="Dummy">
+    <instance_attributes id="iso_mem1-instance_attributes">
+      <nvpair id="iso_mem1-instance_attributes-pcmk_docker_privileged" name="pcmk_docker_privileged" value="true"/>
+      <nvpair id="iso_mem1-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
+    </instance_attributes>
+    <operations>
+      <op id="iso_mem1-monitor-interval-60s" interval="60s" name="monitor"/>
+    </operations>
+  </primitive>
+  <primitive class="ocf" id="iso_mem2" provider="heartbeat" type="Dummy">
+    <instance_attributes id="iso_mem2-instance_attributes">
+      <nvpair id="iso_mem2-instance_attributes-pcmk_docker_privileged" name="pcmk_docker_privileged" value="true"/>
+      <nvpair id="iso_mem2-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
+    </instance_attributes>
+    <operations>
+      <op id="iso_mem2-monitor-interval-60s" interval="60s" name="monitor"/>
+    </operations>
+  </primitive>
+  <meta_attributes id="group_of_containers-meta_attributes"/>
+</group>
+END
+cibadmin -o resources -Mc -x group_of_containers.cib
+
+# privileged master resource with access to attrd
+cat << END >> master.cib
+<master id="ms-master">
+  <primitive class="ocf" id="ms" provider="pacemaker" type="Stateful">
+    <operations>
+      <op id="ms-start-interval-0s" interval="0s" name="start" timeout="20s"/>
+      <op id="ms-stop-interval-0s" interval="0s" name="stop" timeout="20s"/>
+      <op id="ms-promote-interval-0s" interval="0s" name="promote" timeout="20s"/>
+      <op id="ms-demote-interval-0s" interval="0s" name="demote" timeout="20s"/>
+      <op id="ms-monitor-interval-10" interval="10" name="monitor" timeout="20"/>
+      <op id="ms-monitor-interval-11" role="Master" interval="11" name="monitor" timeout="20"/>
+    </operations>
+  </primitive>
+  <meta_attributes id="ms-master-meta_attributes">
+    <nvpair id="ms-master-meta_attributes-clone-max" name="master-max" value="3"/>
+  </meta_attributes>
+  <instance_attributes id="ms-instance_attributes">
+    <nvpair id="ms-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
+    <nvpair id="ms-instance_attributes-docker_opts" name="pcmk_docker_run_opts" value="-v /usr/lib/ocf:/usr/lib/ocf"/>
+    <nvpair id="ms-instance_attributes-docker_privileged" name="pcmk_docker_privileged" value="true"/>
+  </instance_attributes>
+</master>
+END
+cibadmin -o resources -Mc -x master.cib
+
+....
+

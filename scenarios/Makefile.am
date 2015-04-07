@@ -10,6 +10,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	cts-virt-remote.scenario	\
 	docker-apache-aa.scenario	\
 	docker-apache-ap.scenario	\
+	docker-isolation-basic.scenario	\
 	docker-remote.scenario	\
 	ethmonitor-basic.scenario	\
 	example.scenario	\
