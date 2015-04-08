@@ -72,35 +72,26 @@ target=$PHD_ENV_nodes1
 # single isolated resource.
 pcs resource create single Dummy pcmk_docker_image=centos:isolation op start timeout=120s op stop timeout=90s --force
 
-rm -f clone.cib group_is_container.cib group_of_containers.cib master.cib
-phd_rsc_verify_start_all 60
-....
+# cloned isolated resource
+pcs resource create cloned Dummy pcmk_docker_image=centos:isolation op start timeout=120s op stop timeout=90s --clone --force
 
-##
-# Make more complex isolated resources
-##
-target=$PHD_ENV_nodes1
-....
+# group of isolated resources
+pcs resource create g1 Dummy pcmk_docker_image=centos:isolation op start timeout=120s op stop timeout=90s --group  mygroup --force
+pcs resource create g2 Dummy pcmk_docker_image=centos:isolation op start timeout=120s op stop timeout=90s --group  mygroup --force
 
-# clone isolated resources.
-cat << END >> clone.cib
-<clone id="replicated-clone">
-  <instance_attributes id="clone-instance_attributes">
-    <nvpair id="clone-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
-  </instance_attributes>
-  <primitive class="ocf" id="replicated" provider="heartbeat" type="Dummy">
-    <operations>
-        <op id="replicated-start-interval-0s" interval="0s" name="start" timeout="20"/>
-        <op id="replicated-stop-interval-0s" interval="0s" name="stop" timeout="20"/>
-        <op id="replicated-monitor-interval-10" interval="10" name="monitor" timeout="20"/>
-    </operations>
-  </primitive>
-    <meta_attributes id="replicated-clone-meta">
-    </meta_attributes>
-</clone>
-END
-cibadmin -o resources -Mc -x clone.cib
+# multistate isolated resources with access to attrd via ipc proxy
+pcs resource create mastered Stateful pcmk_docker_privileged=true pcmk_docker_image=centos:isolation op start timeout=120s op stop timeout=90s --master --force
 
+# cloned group of isolated resources.
+cibadmin -Q > tmp
+pcs -f tmp resource create cg1 Dummy pcmk_docker_image=centos:isolation op start timeout=120s op stop timeout=90s --group  myclonedgroup --force
+pcs -f tmp resource create cg2 Dummy pcmk_docker_image=centos:isolation op start timeout=120s op stop timeout=90s --group  myclonedgroup --force
+pcs -f tmp resource clone myclonedgroup
+cibadmin --replace --xml-file tmp
+
+
+# group is container running multiple resources in it... TODO figure out a way to configure this without requiring pcs changes.
+rm -f group_is_container.cib
 # group is an isolated resource.
 cat << END >> group_is_container.cib
 <group id="group_is_container">
@@ -128,56 +119,8 @@ cat << END >> group_is_container.cib
 END
 cibadmin -o resources -Mc -x group_is_container.cib
 
-# group of isolated resources
-cat << END >> group_of_containers.cib
-<group id="group_of_containers">
-  <primitive class="ocf" id="iso_mem1" provider="heartbeat" type="Dummy">
-    <instance_attributes id="iso_mem1-instance_attributes">
-      <nvpair id="iso_mem1-instance_attributes-pcmk_docker_privileged" name="pcmk_docker_privileged" value="true"/>
-      <nvpair id="iso_mem1-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
-    </instance_attributes>
-    <operations>
-      <op id="iso_mem1-monitor-interval-60s" interval="60s" name="monitor"/>
-    </operations>
-  </primitive>
-  <primitive class="ocf" id="iso_mem2" provider="heartbeat" type="Dummy">
-    <instance_attributes id="iso_mem2-instance_attributes">
-      <nvpair id="iso_mem2-instance_attributes-pcmk_docker_privileged" name="pcmk_docker_privileged" value="true"/>
-      <nvpair id="iso_mem2-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
-    </instance_attributes>
-    <operations>
-      <op id="iso_mem2-monitor-interval-60s" interval="60s" name="monitor"/>
-    </operations>
-  </primitive>
-  <meta_attributes id="group_of_containers-meta_attributes"/>
-</group>
-END
-cibadmin -o resources -Mc -x group_of_containers.cib
+#TODO clone of group is container
 
-# privileged master resource with access to attrd
-cat << END >> master.cib
-<master id="ms-master">
-  <primitive class="ocf" id="ms" provider="pacemaker" type="Stateful">
-    <operations>
-      <op id="ms-start-interval-0s" interval="0s" name="start" timeout="20s"/>
-      <op id="ms-stop-interval-0s" interval="0s" name="stop" timeout="20s"/>
-      <op id="ms-promote-interval-0s" interval="0s" name="promote" timeout="20s"/>
-      <op id="ms-demote-interval-0s" interval="0s" name="demote" timeout="20s"/>
-      <op id="ms-monitor-interval-10" interval="10" name="monitor" timeout="20"/>
-      <op id="ms-monitor-interval-11" role="Master" interval="11" name="monitor" timeout="20"/>
-    </operations>
-  </primitive>
-  <meta_attributes id="ms-master-meta_attributes">
-    <nvpair id="ms-master-meta_attributes-clone-max" name="master-max" value="3"/>
-  </meta_attributes>
-  <instance_attributes id="ms-instance_attributes">
-    <nvpair id="ms-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
-    <nvpair id="ms-instance_attributes-docker_opts" name="pcmk_docker_run_opts" value="-v /usr/lib/ocf:/usr/lib/ocf"/>
-    <nvpair id="ms-instance_attributes-docker_privileged" name="pcmk_docker_privileged" value="true"/>
-  </instance_attributes>
-</master>
-END
-cibadmin -o resources -Mc -x master.cib
-
+#phd_rsc_verify_start_all 60
 ....
 
