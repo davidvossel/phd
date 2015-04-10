@@ -119,7 +119,35 @@ cat << END >> group_is_container.cib
 END
 cibadmin -o resources -Mc -x group_is_container.cib
 
-#TODO clone of group is container
+#clone of group is container
+rm -f clone_group_is_container.cib
+cat << END >> clone_group_is_container.cib
+<clone id="group_is_container_clone">
+<group id="group_is_container2">
+  <instance_attributes id="clone-group-is-instance_attributes">
+    <nvpair id="clone-group-is-instance_attributes-docker_image" name="pcmk_docker_image" value="centos:isolation"/>
+  </instance_attributes>
+  <primitive class="ocf" id="gs1" provider="heartbeat" type="Dummy">
+    <instance_attributes id="gs1-instance_attributes"/>
+    <operations>
+        <op id="gs1-start-interval-0s" interval="0s" name="start" timeout="120"/>
+        <op id="gs1-stop-interval-0s" interval="0s" name="stop" timeout="90"/>
+        <op id="gs1-monitor-interval-10" interval="10" name="monitor" timeout="20"/>
+    </operations>
+  </primitive>
+  <primitive class="ocf" id="gs2" provider="heartbeat" type="Dummy">
+    <instance_attributes id="gs2-instance_attributes"/>
+    <operations>
+        <op id="gs2-start-interval-0s" interval="0s" name="start" timeout="20"/>
+        <op id="gs2-stop-interval-0s" interval="0s" name="stop" timeout="20"/>
+        <op id="gs2-monitor-interval-10" interval="10" name="monitor" timeout="20"/>
+    </operations>
+  </primitive>
+  <meta_attributes id="clone_group_is_container-meta_attributes"/>
+</group>
+</clone>
+END
+cibadmin -o resources -Mc -x clone_group_is_container.cib
 
 #phd_rsc_verify_start_all 60
 ....
