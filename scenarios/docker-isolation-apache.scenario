@@ -1,0 +1,99 @@
+# Example docker container management scenario
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=2
+packages=pacemaker corosync pcs docker
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# cleanup anything left over from previous run
+##
+target=all
+....
+# make sure docker services are up
+service docker start
+
+# clean up previous containers and images
+for item in $(docker ps -a | awk '{print $1}' | grep -v "CONTAINER"); do docker stop $item; docker rm $item; done
+docker rmi centos:httpd_test > /dev/null 2>&1
+rm -rf Dockerfile rpms
+....
+
+##
+# Make docker images on both nodes for apache.
+##
+target=all
+....
+from="centos:centos7"
+to="centos:httpd_test"
+
+docker pull "$from"
+if [ $? -ne 0 ]; then
+	echo "ERROR: failed to pull docker image $from"
+	exit 1
+fi
+
+# Create Dockerfile for image creation.
+echo "FROM $from" > Dockerfile
+if [ -d "/$HOME/phd_state/phd_scenario/phd_rpms" ]; then
+	rm -rf rpms
+	mkdir rpms
+	echo "ADD /rpms /root/" >> Dockerfile
+	echo "RUN yum install -y /root/*.rpm" >> Dockerfile
+	cp /$HOME/phd_state/phd_scenario/phd_rpms/* rpms/
+else
+	echo "RUN yum install -y pacemaker pacemaker-remote resource-agents" >> Dockerfile
+fi
+
+echo "RUN yum install -y httpd wget" >> Dockerfile
+
+# This is a hack to get an old version of the apache resource-agent
+# to properly build the /var/run/httpd directory correctly on start
+echo "RUN awk -v n=2 -v s=\"mkdir /run/httpd/ && chown -R apache /run/httpd && chgrp -r apache /run/httpd\" 'NR == n {print s} {print}' /usr/lib/ocf/resource.d/heartbeat/apache > /usr/lib/ocf/resource.d/heartbeat/apache.new" >> Dockerfile
+echo "RUN cat /usr/lib/ocf/resource.d/heartbeat/apache.new > /usr/lib/ocf/resource.d/heartbeat/apache" >> Dockerfile
+
+echo "RUN echo '<html><body>My Test Site</body></html>' > /var/www/html/index.html" >> Dockerfile
+
+# build new image with apache in it from our base image.
+docker build -t "$to" .
+if [ $? -ne 0 ]; then
+	echo "ERROR: failed to generate docker image"
+	exit 1
+fi
+
+# cleanup
+rm -rf Dockerfile rpms
+....
+
+##
+# Make a simple isolated resource
+##
+target=$PHD_ENV_nodes1
+....
+pcs resource create web-ip ocf:heartbeat:IPaddr2 ip=$PHD_ENV_floating_ips1 --group web-group
+pcs resource create web-site apache pcmk_docker_run_opts="-p ${PHD_ENV_floating_ips1}:80:80" pcmk_docker_image=centos:httpd_test op start timeout=120s op stop timeout=90s --force --group web-group
+
+phd_rsc_verify_start_all 60
+....
+
+
+##
+# Verify connectivity to http via floating ip
+##
+target=all
+....
+wget ${PHD_ENV_floating_ips1}/index.html
+if [ $? -ne 0 ]; then
+	echo "ERROR: failed to contact httpd server"
+	exit 1
+fi
+rm -f index.html
+....
