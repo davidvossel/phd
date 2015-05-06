@@ -26,17 +26,10 @@
 . ${PHDCONST_ROOT}/lib/transport_ssh.sh
 . ${PHDCONST_ROOT}/lib/transport_qarsh.sh
 
-LOG_ERR="error"
-LOG_ERROR="error"
-LOG_NOTICE="notice"
-LOG_INFO="info"
-LOG_DEBUG="debug"
-
 PHD_LOG_LEVEL=2
 PHD_LOG_STDOUT=1
 PHD_TMP_DIR="/var/lib/phd_state/"
 
-LOG_UNAME=""
 PHD_TRANSPORT=""
 
 phd_detect_transport()
@@ -88,7 +81,7 @@ phd_get_value()
 
 phd_time_stamp()
 {
-	date +%b-%d-%T
+	date +"%b %d %T"
 }
 
 phd_log_priority_index()
@@ -103,10 +96,30 @@ phd_log_priority_index()
 	LOG_TRACE) level=4;;
 	# exec output can only be logged to files
 	LOG_EXEC) level=5;;
-	*) phd_log LOG_WARNING "!!!WARNING!!! Unknown log level ($priority)"
+	*) phd_log LOG_WARNING "!!!WARNING!!! Unknown log level ($priority)";;
 	esac
 
 	return $level
+}
+
+
+phd_log_priority_text()
+{
+	local level=""
+
+	case $priority in
+	LOG_ERROR|LOG_ERR) level="ERROR:";;
+	LOG_WARNING) level="Warn:";;
+	LOG_NOTICE) level="";;
+	LOG_INFO) level="";;
+	LOG_DEBUG) level="debug:";;
+	LOG_TRACE) level="trace:";;
+	# exec output can only be logged to files
+	LOG_EXEC) level="exec";;
+	*) phd_log LOG_WARNING "!!!WARNING!!! Unknown log level ($priority)";;
+	esac
+
+	echo $level
 }
 
 phd_log()
@@ -122,12 +135,11 @@ phd_log()
 		return
 	fi
 
-	if [ -z "$LOG_UNAME" ]; then
-		LOG_UNAME=$(uname -n)
-	fi
-
+	msg_detail="$(basename ${BASH_SOURCE[1]})[$$]:${BASH_LINENO}"
 	if [ -z "$node" ]; then
-		node=$LOG_UNAME
+	    msg_prefix="$(phd_time_stamp): $(phd_log_priority_text $priority) $PHD_SCENARIO:"
+	else
+	    msg_prefix="$(phd_time_stamp): $(phd_log_priority_text $priority) [$(echo $node | awk -F. '{print $0}')] $PHD_SCENARIO:"
 	fi
 
 	case $priority in
@@ -139,16 +151,15 @@ phd_log()
 	phd_log_priority_index "$priority"
 	level=$?
 
-	log_msg="$priority: $node: $(basename ${BASH_SOURCE[1]})[$$]:${BASH_LINENO} - $msg"
 	if [ $level -le $PHD_LOG_LEVEL ]; then
 		if [ $enable_log_stdout -ne 0 ]; then
-			echo -e "$log_msg"
+			echo -e "$msg_prefix $msg"
 		fi
 	fi
 
 	# log everything to log file
 	if [ -n "$PHD_LOG_FILE" ]; then
-		echo "$(phd_time_stamp): $log_msg" >> $PHD_LOG_FILE
+	    echo -e "$msg_prefix $msg_detail $msg" >> $PHD_LOG_FILE
 	fi
 }
 
@@ -362,6 +373,28 @@ phd_wait_pidof()
 	done
 
 	return 0
+}
+
+phd_wait_connection()
+{
+	local retries=$1; shift
+	local nodes=$1
+	local lpc=0
+
+	for node in $(echo $nodes); do
+		lpc=0
+		while [ $lpc -lt $retries ]; do
+		    phd_cmd_exec "ls > /dev/null 2>&1" "$node"
+		    if [ $? -eq 0 ]; then
+			phd_log LOG_DEBUG "Node ($node) is accessible"
+			break
+		    fi
+		    lpc=$((lpc + 1))
+		done
+		if [ $lpc -eq $retries ]; then
+			phd_exit_failure "Unable to establish connection with node \"$node\"."		    
+		fi
+	done
 }
 
 phd_verify_connection()
