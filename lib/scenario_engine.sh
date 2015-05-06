@@ -32,6 +32,7 @@ SENV_PREFIX="PHD_SENV"
 SREQ_PREFIX="PHD_SREQ"
 SCRIPT_PREFIX="PHD_SCPT"
 
+SEC_VAR="VARIABLES"
 SEC_REQ="REQUIREMENTS"
 SEC_LOCAL="LOCAL_VARIABLES"
 SEC_SCRIPTS="SCRIPTS"
@@ -69,6 +70,12 @@ scenario_script_add_env()
 		local value=$(echo $tmp | awk -F= '{print $2}')
 		echo "export $key=\"${value}\"" >> $script
 	done < <(print_definition)
+
+	while read tmp; do
+		local key=$(echo $tmp | awk -F= '{print $1}')
+		local value=$(echo $tmp | awk -F= '{print $2}')
+		echo "export $key=${value}" >> $script
+	done < <(env | grep PHD_VAR_)
 }
 
 scenario_install_nodes()
@@ -100,6 +107,23 @@ scenario_generate_tests()
 	done
 }
 
+function parse_yaml {
+	local prefix=$2
+	local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+	sed -ne "s|^\($s\):|\1|" \
+		-e "s|^\($s\)\($w\)$s:$s[\"']\(.*\)[\"']$s\$|\1$fs\2$fs\3|p" \
+		-e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+	awk -F$fs '{
+		indent = length($1)/2;
+		vname[indent] = $2;
+		for (i in vname) {if (i > indent) {delete vname[i]}}
+		if (length($3) > 0) {
+			vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+			printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+		}
+	}'
+}
+
 scenario_unpack()
 {
 	local section=""
@@ -112,24 +136,97 @@ scenario_unpack()
 
 	local old_IFS=$IFS
 	IFS=$'\n'
+	
+	local SREQ_YAML=/tmp/$$.req.yaml
+	local SVAR_YAML=/tmp/$$.var.yaml
+	local writing_script=0
 
-	for line in $(cat $1 | grep -v -e "[[:space:]]#" -e "^#")
+	rm -f ${SREQ_YAML}
+	rm -f ${SVAR_YAML}
+
+	if [ ! -z $2 ]; then
+	    for req in $(parse_yaml ${2} "PHD_VAR_")
+	    do
+		phd_log LOG_DEBUG "Parsed: ${req}"
+		export ${req}
+	    done
+	fi
+
+	for line in $(cat $1 | grep -v -e "^[[:space:]]#" -e "^#")
 	do
 		cleaned=$(echo "$line" | tr -d ' ')
 		if [ "${cleaned:0:1}" = "=" ]; then
 			cleaned=$(echo "$cleaned" | tr -d '=')
 		fi
 
+		# determine if we are writing to a script
+		if [ "$cleaned" = "...." ]; then
+		    if [ "$writing_script" -eq 0 ]; then
+			writing_script=1
+			cur_script=${PHD_TMP_DIR}/${SCRIPT_PREFIX}${script_num}
+			export "${SCRIPT_PREFIX}_${script_num}=${cur_script}"
+			echo "#!/bin/bash" > ${cur_script}
+			
+			IFS=$old_IFS
+			scenario_script_add_env "$cur_script"
+			IFS=$'\n'
+			chmod 755 ${cur_script}
+		    else
+			writing_script=0
+			script_num=$(($script_num + 1))
+		    fi 
+		    continue
+		fi
+
+		# If writing, append to latest script file
+		if [ "$writing_script" -eq 1 ]; then
+		    echo "$line" >> ${cur_script}
+		    continue
+		fi
+
+		: case - cleaned in $cleaned
 		case $cleaned in
-		$SEC_REQ|$SEC_LOCAL|$SEC_SCRIPTS)
+		    \.\.\.\.)
+			continue ;;
+		    $SEC_REQ)
 			section=$cleaned
+			continue ;;
+		    $SEC_VAR)
+			section=$cleaned
+			continue ;;
+		    $SEC_LOCAL|$SEC_SCRIPTS)
+			section=$cleaned
+			if [ -e ${SREQ_YAML} ]; then
+
+			    for req in $(parse_yaml ${SREQ_YAML} ${SREQ_PREFIX}_)
+			    do
+				phd_log LOG_DEBUG "Parsed: ${req}"
+				export ${req}
+			    done
+			    rm -f ${SREQ_YAML}
+			fi
 			continue ;;
 		*) : ;;
 		esac
 
+		: case - section in $section
 		case $section in
+		$SEC_VAR)
+			if [ $(eval echo '${'${line}'}') ]; then
+			    echo "Variable $line = $(eval echo '${'${line}'}')"
+			else
+			    echo "Variable $line is undefined"
+			    exit 1
+			fi
+			continue ;;
 		$SEC_REQ)
-			export "${SREQ_PREFIX}_$line"
+			if
+			    echo "$line" | grep -qe = 
+			then
+			    export "${SREQ_PREFIX}_$line"
+			else
+			    echo "$line" >> ${SREQ_YAML}
+			fi
 			continue ;;
 		$SEC_LOCAL)
 			export "${SENV_PREFIX}_$cleaned"
@@ -138,43 +235,24 @@ scenario_unpack()
 		*) : ;;
 		esac
 
-		# determine if we are writing to a script
-		if [ "$cleaned" = "...." ]; then
-			if [ "$writing_script" -eq 0 ]; then
-				writing_script=1
-				cur_script=${PHD_TMP_DIR}/${SCRIPT_PREFIX}${script_num}
-				export "${SCRIPT_PREFIX}_${script_num}=${cur_script}"
-				echo "#!/bin/bash" > ${cur_script}
-				
-				IFS=$old_IFS
-				scenario_script_add_env "$cur_script"
-				IFS=$'\n'
-				chmod 755 ${cur_script}
-			else
-				writing_script=0
-				script_num=$(($script_num + 1))
-			fi 
-			continue
+		if [ -z "$cleaned" ]; then
+		    continue
 		fi
 
-		# If writing, append to latest script file
-		if [ "$writing_script" -eq 1 ]; then
-			echo "$line" >> ${cur_script}
-		else
-			if [ -z "$cleaned" ]; then
-				continue
-			fi
+		local key=$(echo $cleaned | awk -F= '{print $1}')
+		local value=$(echo $cleaned | awk -F= '{print $2}')
 
-			local key=$(echo $cleaned | awk -F= '{print $1}')
-			local value=$(echo $cleaned | awk -F= '{print $2}')
-
-			local cleaned_value=$(phd_get_value $value)
-			if [ -z "$cleaned_value" ]; then
-				phd_log LOG_ERR "no value found for \"$line\" for script number $script_num in scenario file"
-				continue
-			fi
-			export "${SENV_PREFIX}_${key}${script_num}=${cleaned_value}"
+		if [ $key = target ]; then
+		    value=$(echo $line | awk -F= '{print $2}')
 		fi
+
+		local cleaned_value=$(phd_get_value $value)
+		if [ -z "$cleaned_value" ]; then
+		    phd_log LOG_ERR "no value found for \"$line\" for script number $script_num in scenario file"
+		    continue
+		fi
+		export ${SENV_PREFIX}_${key}${script_num}="${cleaned_value}"
+
 	done
 
 	IFS=$old_IFS
@@ -194,12 +272,17 @@ scenario_package_install()
 	local custom_package_dir=$(definition_package_dir)
 	local packages=$(eval echo "\$${SREQ_PREFIX}_packages")
 
+	if [ "x$packages" != x ]; then
+	    phd_log LOG_NOTICE "=========================" 
+	    phd_log LOG_NOTICE "==== Package Install ====" 
+	    phd_log LOG_NOTICE "=========================" 
+	    
 	# install custom packages from a directory
-	package_install_custom "$custom_package_dir"  "$nodes"
+	    package_install_custom "$custom_package_dir"  "$nodes"
 
 	# install required scenario packages
-	package_install "$packages" "$nodes"
-
+	    package_install "$packages" "$nodes"
+	fi
 }
 
 scenario_storage_destroy()
@@ -209,14 +292,16 @@ scenario_storage_destroy()
 	local shared_dev=$(definition_shared_dev)
 
 	if [ -z "$wipe" ]; then
-		phd_log LOG_NOTICE "Success: Skipping."
 		return
 	fi
 
 	if [ "$wipe" -ne 1 ]; then
-		phd_log LOG_NOTICE "Success: Skipping."
 		return
 	fi
+
+	phd_log LOG_NOTICE "==================================" 
+	phd_log LOG_NOTICE "====  Checking Shared Storage ====" 
+	phd_log LOG_NOTICE "==================================" 
 
 	if [ -z "$shared_dev" ]; then
 		phd_exit_failure "Could not clear shared storage, cluster definition contains no shared storage."
@@ -236,7 +321,7 @@ scenario_cluster_destroy()
 {
 	local cluster_destroy=$(eval echo "\$${SREQ_PREFIX}_cluster_destroy")
 	local cluster_init=$(eval echo "\$${SREQ_PREFIX}_cluster_init")
-	local destroy=1
+	local destroy=0
 
 	if [ -n "$cluster_destroy" ]; then
 		destroy=1
@@ -246,11 +331,14 @@ scenario_cluster_destroy()
 	fi
 
 	if [ "$destroy" -eq "1" ]; then
+	    phd_log LOG_NOTICE "====================================" 
+	    phd_log LOG_NOTICE "====  Checking Cluster Shutdown ====" 
+	    phd_log LOG_NOTICE "====================================" 
 		pacemaker_cluster_stop
 		pacemaker_cluster_clean
 		phd_log LOG_NOTICE "Success: Cluster destroyed"
 	else 
-		phd_log LOG_NOTICE "Success: Skipping cluster destroy"
+		phd_log LOG_NOTICE "Skipping cluster destroy"
 	fi
 }
 
@@ -263,12 +351,16 @@ scenario_cluster_init()
 	fi
 
 	if [ "$cluster_init" -eq "1" ]; then
+	    phd_log LOG_NOTICE "==================================" 
+	    phd_log LOG_NOTICE "==== Checking Cluster Startup ====" 
+	    phd_log LOG_NOTICE "==================================" 
+
 		pacemaker_cluster_init
 		pacemaker_cluster_start
 		pacemaker_fence_init
 		phd_log LOG_NOTICE "Success: Cluster started"
 	else 
-		phd_log LOG_NOTICE "Success: Skipping cluster start"
+		phd_log LOG_NOTICE "Skipping cluster start"
 
 	fi
 }
@@ -279,26 +371,35 @@ scenario_distribute_api()
 	local nodes=$(definition_nodes)
 	local file
 
+	if [ $api_init = 0 ]; then
+	    phd_log LOG_NOTICE "==============================================" 
+	    phd_log LOG_NOTICE "==== Asuming PHD API is already installed ====" 
+	    phd_log LOG_NOTICE "==============================================" 
+	    return
+	fi
+
 	phd_log LOG_NOTICE "============================" 
 	phd_log LOG_NOTICE "==== Distribute PHD API ====" 
 	phd_log LOG_NOTICE "============================" 
 
-	for file in $(echo $api_files); do
-		file=$(basename $file)
-		# copy it remotely
-		phd_node_cp "${PHDCONST_ROOT}/lib/${file}" "${PHD_TMP_DIR}/lib/${file}" "$nodes" "755"
-		if [ $? -ne 0 ]; then
-			phd_exit_failure "Failed to distribute phd API to nodes. Exiting."
-		fi
+	# also copy it locally
+	cp -r ${PHDCONST_ROOT}/lib/* "${PHD_TMP_DIR}/lib/"
 
-		# also copy it locally
-		cp "${PHDCONST_ROOT}/lib/${file}" "${PHD_TMP_DIR}/lib/${file}"
-	done
+	# copy it remotely
+	phd_node_cp "${PHDCONST_ROOT}/lib/*" "${PHD_TMP_DIR}/lib/" "$nodes" "755"
+	if [ $? -ne 0 ]; then
+	    phd_exit_failure "Failed to distribute phd API to nodes. Exiting."
+	fi
+	
 	phd_log LOG_NOTICE "Success: API distributed to nodes ($nodes)"
 }
 
 scenario_environment_defaults()
 {
+	phd_log LOG_NOTICE "===================================="
+	phd_log LOG_NOTICE "==== Distribute Default Configs ====" 
+	phd_log LOG_NOTICE "====================================" 
+
 	local nodes=$(definition_nodes)
 
 	# install configs and other environment constants that we
@@ -331,6 +432,7 @@ scenario_script_exec()
 		fi
 
 		nodes=$(eval echo "\$${SENV_PREFIX}_target${script_num}")
+		echo "nodes: $nodes"
 		if [ -z "$nodes" ]; then
 			nodes=$(definition_nodes)
 		fi
@@ -400,31 +502,16 @@ scenario_exec()
 	scenario_clean_nodes
 	phd_log LOG_NOTICE "Success: all nodes are accessible"
 
-	phd_log LOG_NOTICE "====================================" 
-	phd_log LOG_NOTICE "====  Checking Cluster Shutdown ====" 
-	phd_log LOG_NOTICE "====================================" 
 	scenario_cluster_destroy
 
-	phd_log LOG_NOTICE "==================================" 
-	phd_log LOG_NOTICE "====  Checking Shared Storage ====" 
-	phd_log LOG_NOTICE "==================================" 
 	scenario_storage_destroy
 
-	phd_log LOG_NOTICE "=========================" 
-	phd_log LOG_NOTICE "==== Package Install ====" 
-	phd_log LOG_NOTICE "=========================" 
 	scenario_package_install
 
 	scenario_distribute_api
 
-	phd_log LOG_NOTICE "===================================="
-	phd_log LOG_NOTICE "==== Distribute Default Configs ====" 
-	phd_log LOG_NOTICE "====================================" 
 	scenario_environment_defaults
 
-	phd_log LOG_NOTICE "==================================" 
-	phd_log LOG_NOTICE "==== Checking Cluster Startup ====" 
-	phd_log LOG_NOTICE "==================================" 
 	scenario_cluster_init
 
 	phd_log LOG_NOTICE "======================================" 

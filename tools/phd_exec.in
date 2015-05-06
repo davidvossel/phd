@@ -23,14 +23,21 @@
 # Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
 #
 
+PHD_BINARY_DIR=`dirname $0`
 if [ -z "$PHDCONST_ROOT" ]; then
+    if [ -f ${PHD_BINARY_DIR}/phd_exec.in ]; then
+	# Running from the source tree
+	PHDCONST_ROOT="$PHD_BINARY_DIR/.."
+    else
 	PHDCONST_ROOT="@libexecdir@/phd"
+    fi
 fi
 
 # Location of current scenario data
 exec_dir="@localstatedir@/lib/phd"
 definition="@sysconfdir@/phd/cluster_definition.conf"
 scenario_dir="@libexecdir@/@PACKAGE@/scenarios"
+variables=""
 
 if ! [ -w $exec_dir ]; then
        exec_dir="$HOME/phd_state"
@@ -56,6 +63,7 @@ function helptext() {
 	echo "Options"
 	echo "-p, --print-env          Print cluster definition environment variables"
 	echo "-s, --scenario           Scenario file name."
+	echo "-V, --variables          Variable definitions"
 	echo "-l, --list-scenarios     List installed scenario files."
 	echo "-d, --definition         Custom definition file location. Defaults to $definition"
 	echo "-v, --verify-definition  Verify cluster definition can run the scenario file"
@@ -63,6 +71,7 @@ function helptext() {
 	echo "-t, --run-tests          Deploy scenario and run scenario tests after deployment."
 	echo "-o, --run-tests-only     Only run tests on deployment." 
 	echo "-a, --distribute-api-only     Only redistribute the current phd api. This is useful during scenario development." 
+	echo "-A, --distribute-api-never    Assume the current phd api is already in place. This is useful during scenario development." 
 	echo "-f, --log-file           Custom logfile location."
 	echo "-L, --log-level-stdout   Log level 0-4. The higher the level, the more output."
 	echo "-q, --quiet              Keep stdout quiet."
@@ -77,6 +86,7 @@ log_file="$exec_dir/phd.log"
 only_tests=0
 test_iter=10
 api_only=0
+api_init=1
 
 while true ; do
 	case "$1" in
@@ -87,9 +97,11 @@ while true ; do
 	-t|--run-tests)  tests=1; shift;;
 	-o|--run-tests-only)  only_tests=1; shift;;
 	-a|--distribute-api-only)  api_only=1; shift;;
+	-A|--distribute-api-never)  api_init=0; shift;;
 	-f|--log-file)  log_file=$2; shift; shift;;
 	-d|--definition)  definition=$2; shift; shift;;
 	-s|--scenario)  scenario=$2; shift; shift;;
+	-V|--variables)  variables=$2; shift; shift;;
 	-l|--list-scenarios) ls -1 $scenario_dir
 		exit 0;;
 	-L|--log-level-stdout) phd_set_log_level $2; shift; shift;;
@@ -127,8 +139,22 @@ if [ ! -e "$scenario" ]; then
 		fi
 	fi
 fi
+PHD_SCENARIO=$scenario
 
-scenario_unpack $scenario
+if [ ! -z "$variables" ]; then
+    if [ ! -e "$variables" ]; then
+	variables="$HOME/.phd/$variables" 
+	if [ ! -e "$variables" ]; then
+		variables="${variables}.variables"
+		if [ ! -e "$variables" ]; then
+			echo "Error: Can not find specified variables file"
+			exit 1
+		fi
+	fi
+    fi
+fi
+
+scenario_unpack $scenario $variables
 if [ $print_env -eq 1 ]; then
 	print_definition
 	print_scenario
