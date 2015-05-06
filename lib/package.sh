@@ -91,7 +91,7 @@ package_install()
 	# with the scenario packages
 	local unique=$(echo "$packages $custom_packages" | sed 's/\s/\n/g' | sort | uniq -u)
 	packages=$(echo "$packages $unique" | sed 's/\s/\n/g' | sort | uniq -d | tr '\n' ' ')
-	if [ -z "$packages" ]; then
+	if [ -z "$packages" -o "$packages" = " " ]; then
 		phd_log LOG_NOTICE "Success: no package install required."
 		return 0
 	fi
