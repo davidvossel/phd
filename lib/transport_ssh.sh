@@ -31,7 +31,7 @@ phd_ssh_cp()
 	local src=$1
 	local dest=$2
 	local node=$3
-	local fullcmd="scp $PHD_SSH_OPTS $src root@$node:${dest}"
+	local fullcmd="scp -r $PHD_SSH_OPTS $src root@$node:${dest}"
 
 	timeout -s kill 300 $fullcmd
 }
@@ -42,7 +42,7 @@ phd_ssh_cmd_exec()
 	local node=$2
 	local fullcmd="ssh $PHD_SSH_OPTS -l root $node $cmd"
 
-	timeout -s KILL 300 $fullcmd
+	timeout -s KILL 1800 $fullcmd
 }
 
 #phd_ssh_connection_verify()
