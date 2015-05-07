@@ -31,7 +31,7 @@ phd_qarsh_cp()
 	local dest=$2
 	local node=$3
 
-	qacp $src root@${node}:${dest}
+	qacp -r $src root@${node}:${dest}
 }
 
 phd_qarsh_cmd_exec()
