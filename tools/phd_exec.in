@@ -28,6 +28,7 @@ if [ -z "$PHDCONST_ROOT" ]; then
     if [ -f ${PHD_BINARY_DIR}/phd_exec.in ]; then
 	# Running from the source tree
 	PHDCONST_ROOT="$PHD_BINARY_DIR/.."
+	scenario_dir="$PHDCONST_ROOT/scenarios"
     else
 	PHDCONST_ROOT="@libexecdir@/phd"
     fi
@@ -36,7 +37,9 @@ fi
 # Location of current scenario data
 exec_dir="@localstatedir@/lib/phd"
 definition="@sysconfdir@/phd/cluster_definition.conf"
-scenario_dir="@libexecdir@/@PACKAGE@/scenarios"
+if [ -z "$scenario_dir" ]; then
+	scenario_dir="@libexecdir@/@PACKAGE@/scenarios"
+fi
 variables=""
 
 if ! [ -w $exec_dir ]; then
