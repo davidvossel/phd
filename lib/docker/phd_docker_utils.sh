@@ -42,20 +42,6 @@ fi
 mkdir -p $PHD_DOCKER_LOGDIR
 mkdir -p $PHD_DOCKER_LIB
 
-cp_cmd()
-{
-	local src=$1
-	local dst=$2
-	local node=$3
-
-	local dock_id="$(docker inspect --format {{.ID}} $node)"
-	if [ "$dock_id" = "<no value>" ]; then
-		dock_id="$(docker inspect --format {{.Id}} $node)"
-	fi
-
-	cp $src "/var/lib/docker/devicemapper/mnt/${dock_id}/rootfs/${dst}"
-}
-
 exec_cmd()
 {
 	echo "$1" | nsenter --target $(docker inspect --format {{.State.Pid}} ${2}) --mount --uts --ipc --net --pid
@@ -193,6 +179,10 @@ write_helper_scripts()
 	local node=$1
 	local ip=$2
 	local tmp
+	local helper_dir="${node}_helpers"
+
+	rm -rf $helper_dir
+	mkdir $helper_dir
 
 	tmp=$(mktemp)
 	cat << END >> $tmp
@@ -201,8 +191,7 @@ export OCF_ROOT=/usr/lib/ocf/ OCF_RESKEY_ip=$ip OCF_RESKEY_cidr_netmask=32
 /usr/lib/ocf/resource.d/heartbeat/IPaddr2 start
 END
 	chmod 755 $tmp
-	cp_cmd $tmp /usr/sbin/ip_start $node
-	rm -f $tmp
+	mv $tmp $helper_dir/ip_start
 
 	tmp=$(mktemp)
 	cat << END >> $tmp
@@ -229,8 +218,7 @@ fi
 exit 0
 END
 	chmod 755 $tmp
-	cp_cmd $tmp /usr/sbin/pcmk_start $node
-	rm -f $tmp
+	mv $tmp $helper_dir/pcmk_start
 
 	tmp=$(mktemp)
 	cat << END >> $tmp
@@ -254,8 +242,7 @@ fi
 exit 0
 END
 	chmod 755 $tmp
-	cp_cmd $tmp /usr/sbin/pcmk_remote_start $node
-	rm -f $tmp
+	mv $tmp $helper_dir/pcmk_remote_start
 
 	tmp=$(mktemp)
 	cat << END >> $tmp
@@ -306,8 +293,7 @@ killall -q -9 'corosync'
 exit 0
 END
 	chmod 755 $tmp
-	cp_cmd $tmp /usr/sbin/pcmk_stop $node
-	rm -f $tmp
+	mv $tmp $helper_dir/pcmk_stop
 
 	tmp=$(mktemp)
 	cat << END >> $tmp
@@ -349,11 +335,9 @@ stop "pacemaker_remoted"
 exit 0
 END
 	chmod 755 $tmp
-	cp_cmd $tmp /usr/sbin/pcmk_remote_stop $node
-	rm -f $tmp
+	mv $tmp $helper_dir/pcmk_remote_stop
 
-	exec_cmd "mkdir -p /etc/pacemaker/" "$node"
-	exec_cmd "echo \"this is a pretty insecure key\" > /etc/pacemaker/authkey" "$node"
+	echo "this is a pretty insecure key" > $helper_dir/authkey
 }
 
 launch_pcmk()
@@ -399,9 +383,12 @@ launch_remote_containers()
 		name="${remote_nodeprefix}${c}"
 		echo "Launching remote node $name"
 
-		docker $doc_opts run -d -P -h $name --name=$name $image /bin/bash
-		verify_connection "$name"
 		write_helper_scripts "$name" "${remoteiprange}${c}"
+		docker $doc_opts run -v $PWD/${name}_helpers:/usr/sbin/pcmk_helpers/  -d -P -h $name --name=$name $image /bin/bash
+		verify_connection "$name"
+		exec_cmd "cp /usr/sbin/pcmk_helpers/* /usr/sbin/" "$name"
+		exec_cmd "mkdir /etc/pacemaker" "$name"
+		exec_cmd "cp /usr/sbin/pcmk_helpers/authkey /etc/pacemaker/" "$name"
 	done
 }
 
@@ -415,16 +402,16 @@ launch_containers()
 	for (( c=1; c <= $containers; c++ ))
 	do
 		name="${cluster_nodeprefix}${c}"
+		ip="${pcmkiprange}$c"
 		echo "Launching node $name"
+		write_helper_scripts "$name" "$ip"
 
 		if [ $debug_container -eq 0 ]; then
-			docker $doc_opts run -d -P -h $name --name=$name $image /bin/bash
+			docker $doc_opts run -v $PWD/${name}_helpers:/usr/sbin/pcmk_helpers/ -d -P -h $name --name=$name $image /bin/bash
 		else
-			docker $doc_opts run -i -t -P -h $name --name=$name $image /bin/bash
+			docker $doc_opts run -v $PWD/${name}_helpers:/usr/sbin/pcmk_helpers/  -i -t -P -h $name --name=$name $image /bin/bash
 			exit 0
 		fi
-
-		ip="${pcmkiprange}$c"
 
 		if [ -z "$node_ips" ]; then
 			node_ips="$ip"
@@ -441,6 +428,10 @@ launch_containers()
 
 		verify_connection "$name"
 		echo "setting up cluster"
+		exec_cmd "cp /usr/sbin/pcmk_helpers/* /usr/sbin/" "$name"
+		exec_cmd "mkdir /etc/pacemaker" "$name"
+		exec_cmd "cp /usr/sbin/pcmk_helpers/authkey /etc/pacemaker/" "$name"
+
 		exec_cmd "pcs cluster setup --local --name mycluster $node_ips"  "$name" > /dev/null 2>&1
 		if [ "$?" -ne 0 ]; then
 			exec_cmd "pcs cluster setup --local mycluster $node_ips"  "$name" > /dev/null 2>&1
@@ -448,7 +439,6 @@ launch_containers()
 		# make sure we use file based logging 
 		exec_cmd 'cat /etc/corosync/corosync.conf | sed "s/to_syslog:.*yes/to_logfile: yes\\nlogfile: \\/var\\/log\\/pacemaker.log/g" > /etc/corosync/corosync.conf.bu' "$name"
 		exec_cmd "mv -f /etc/corosync/corosync.conf.bu /etc/corosync/corosync.conf" "$name"
-		write_helper_scripts "$name" "$ip"
 
 	done
 
@@ -480,6 +470,7 @@ integrate_remote_containers()
 		if [ $? -eq 0 ]; then
 			break;
 		fi
+		sleep 2
 		echo "waiting for cluster to initialize in order to integrate remote nodes"
 	done
 
