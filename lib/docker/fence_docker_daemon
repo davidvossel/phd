@@ -38,17 +38,11 @@ function respond()
 	echo "Sending Response to source node: $node"
 	echo "Return String: $string"
 	if [ "$us" = "$node" ]; then
-		write_file=$returnfile
-	else
-		dock_id="$(docker inspect --format {{.ID}} $node)"
-		if [ "$dock_id" = "<no value>" ]; then
-			dock_id="$(docker inspect --format {{.Id}} $node)"
-		fi
-		write_file="/var/lib/docker/devicemapper/mnt/${dock_id}/rootfs/$returnfile"
+		echo $string > "/${returnfile}"
+	else 
+		phd_docker_cmd "$node"  "echo \"$string\" > \"/${returnfile}\""
 	fi
 
-	echo "Return File: $write_file"
-	echo "$string" > $write_file
 	kill -9 $pid
 }
 
