@@ -121,6 +121,14 @@ baremetal_set_env()
 			exit 1
 		fi
 	done
+
+	# account for cloned resource now.
+	fake_rsc_count=$(( $remote_containers + $containers + $fake_rsc_count ))
+	exec_cmd "pcs resource create cFAKE Dummy --clone notify=true" "$cluster_node"
+	if [ $? -ne 0 ]; then
+		echo "failed to create resources for baremetal remote node tests"
+		exit 1
+	fi
 }
 
 launch_baremetal_remote_tests()
@@ -151,7 +159,7 @@ launch_baremetal_remote_tests()
 		echo "killing node $name"
 
 		docker kill $name
-		baremetal_verify_state $total_rsc 1 $name
+		baremetal_verify_state "$(( $total_rsc - 1 ))" 1 $name
 		rm -f /var/run/fence_docker_daemon.count
 		sleep 5
 		echo "bring node $name back online"
