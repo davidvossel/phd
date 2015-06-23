@@ -1,0 +1,68 @@
+# verify basic nagios  support
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=3
+floating_ips=1
+packages=pacemaker pacemaker-nagios-plugins-metadata corosync pcs resource-agents 
+cluster_init=1
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# Verify we have nagios tcp plugin. if not, attempt to install it.
+# we're using check_tcp plugin to test nagios support in pacemaker
+##
+target=all
+....
+ls /usr/lib64/nagios/plugins/check_tcp
+if [ $? -eq 0 ]; then
+	exit 0
+fi
+
+yum install -y nagios-plugins-tcp
+if [ $? -eq 0 ]; then
+	exit 0
+fi
+
+echo "Error: unable to detect check_tcp nagios plugin"
+exit 1
+....
+
+##
+# Verify nagios is a listed standard on all cluster nodes.
+##
+target=all
+....
+pcs resource standards | grep nagios
+if [ $? -ne 0 ]; then
+	echo "Error: nagios is not a listed standard in pcs resource standards."
+	exit 1
+fi
+crm_resource --list-agents=nagios | grep check_tcp
+if [ $? -ne 0 ]; then
+	echo "Error: check_tcp is not found as a valid nagios resource type"
+	exit 1
+fi
+
+# TODO find out why this doesn't work in pcs right now
+# pcs resource describe nagios:check_tcp
+# Error: Unable to find resource: nagios:check_tcp
+exit 0
+....
+
+target=$PHD_ENV_nodes1
+....
+## TODO make fixes to pcs so we don't need --force.
+# This is just verifying that port 22 is open on the first node.
+# typically in a phd environment ssh is used on every node. 
+pcs resource create tcp nagios:check_tcp hostname=$PHD_ENV_nodes1 port=22 --force
+
+# wait for all resources to start before moving on.
+phd_rsc_verify_start_all 90
+....

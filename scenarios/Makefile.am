@@ -24,6 +24,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	iSCSILogicalUnit-targetcli.scenario	\
 	iSCSITarget-targetcli.scenario		\
 	mariadb-basic.scenario	\
+	nagios-basic.scenario	\
 	nfs-active-active.scenario	\
 	nfs-active-passive.scenario	\
 	nfs-basic.scenario	\
