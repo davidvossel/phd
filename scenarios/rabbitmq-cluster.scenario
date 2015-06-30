@@ -5,7 +5,7 @@
 #################################
 = REQUIREMENTS =
 nodes=2
-packages=pacemaker corosync pcs rabbitmq-server resource-agents
+packages=pacemaker corosync pcs rabbitmq-server resource-agents wget
 cluster_init=1
 
 ######################
@@ -22,6 +22,11 @@ target=all
 systemctl stop rabbitmq-server
 systemctl disable rabbitmq-server
 rabbitmqctl stop
+
+# testing agent
+#wget https://raw.githubusercontent.com/davidvossel/resource-agents/rabbit-mon-fix/heartbeat/rabbitmq-cluster 
+#cat rabbitmq-cluster > /usr/lib/ocf/resource.d/heartbeat/rabbitmq-cluster
+#rm -f rabbitmq-cluster
 
 # setting the cookie this way is only done for testing purposes
 # don't actually do it this way.
