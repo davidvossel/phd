@@ -3,6 +3,7 @@
 .  ${PHD_DOCKER_LIB}/phd_docker_utils.sh
 
 fake_rsc_count=0
+cloned_fake_rsc_count=4
 
 launch_cts()
 {
@@ -110,7 +111,7 @@ baremetal_set_env()
 	local cluster_node="${cluster_nodeprefix}1"
 	local rsc
 
-	fake_rsc_count=$(( $remote_containers * 10 ))
+	fake_rsc_count=$(( $remote_containers * 2 ))
 	rsc=$fake_rsc_count
 
 	for (( c=1; c <= $rsc; c++ ))
@@ -122,13 +123,17 @@ baremetal_set_env()
 		fi
 	done
 
-	# account for cloned resource now.
-	fake_rsc_count=$(( $remote_containers + $containers + $fake_rsc_count ))
-	exec_cmd "pcs resource create cFAKE Dummy --clone notify=true" "$cluster_node"
-	if [ $? -ne 0 ]; then
-		echo "failed to create resources for baremetal remote node tests"
-		exit 1
-	fi
+	for (( c=1; c <= $cloned_fake_rsc_count; c++ ))
+	do
+		# increment rsc count by the number of cloned resource instances we'd expect.
+		# each clone is like adding cluster nodes + remote nodes to the total rsc count.
+		fake_rsc_count=$(( $remote_containers + $containers + $fake_rsc_count ))
+		exec_cmd "pcs resource create FAKECLONE${c} Dummy --clone notify=true" "$cluster_node"
+		if [ $? -ne 0 ]; then
+			echo "failed to create resources for baremetal remote node tests"
+			exit 1
+		fi
+	done
 }
 
 launch_baremetal_remote_tests()
@@ -159,7 +164,7 @@ launch_baremetal_remote_tests()
 		echo "killing node $name"
 
 		docker kill $name
-		baremetal_verify_state "$(( $total_rsc - 1 ))" 1 $name
+		baremetal_verify_state "$(( $total_rsc - $cloned_fake_rsc_count ))" 1 $name
 		rm -f /var/run/fence_docker_daemon.count
 		sleep 5
 		echo "bring node $name back online"
