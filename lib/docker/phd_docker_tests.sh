@@ -190,7 +190,7 @@ launch_baremetal_remote_tests()
 
 	for (( c=1; c <= $iter; c++ ))
 	do
-		local num_kill_nodes=1
+		local num_kill_nodes=2
 
 		echo "============== ITERATION NUMBER $c OUT OF $iter ==============="
 		kill_random_nodes $num_kill_nodes $total_rsc
@@ -200,12 +200,12 @@ launch_baremetal_remote_tests()
 		echo "bring nodes [$NODE_KILL_LIST] back online"
 
 		for node in $(echo $NODE_KILL_LIST); do
-			# TODO this cleanup should go away after i do the reconnect interval stufff
 			echo "$node" | grep "remote" > /dev/null 2>&1
 			if [ $? -eq 0 ]; then
 				launch_pcmk_remote_full "$node"
 				# clear the failcount on the remote node
-				exec_cmd "crm_resource -C -r $node" "${cluster_nodeprefix}1"
+			# TODO this cleanup should go away after i do the reconnect interval stufff
+#				exec_cmd "crm_resource -C -r $node" "${cluster_nodeprefix}1"
 			else
 				launch_pcmk_full $node
 			fi
