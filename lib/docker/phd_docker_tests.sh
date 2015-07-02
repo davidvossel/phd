@@ -61,6 +61,11 @@ baremetal_verify_state()
 			continue
 		fi
 
+		fencing_count="$(cat /var/run/fence_docker_daemon.count)"
+		if [ -n "$fencing_count" ] && [ "$expected_fencing_actions" = "0" ]; then
+			echo "WARNING: whoa, someone got fenced when expected fence actions is 0"
+		fi
+
 		for node in $(echo $offline); do
 			echo "$output" | grep -q "node.*name=.${node}. .*online=.false.*unclean=.false"
 			if [ $? -ne 0 ]; then
@@ -142,6 +147,7 @@ kill_random_nodes() {
 	local num=$1
 	local name
 	local index
+	local cluster_nodes_killed=0
 
 	NODE_KILL_NEW_RSC_COUNT=$2
 	NODE_KILL_LIST=""
@@ -149,12 +155,16 @@ kill_random_nodes() {
 	while [ $num -gt 0 ]; do
 		local node_type=$(( ($RANDOM % 2) + 1 ))
 
-		if [ $node_type -eq 1 ]; then
+		# TODO force fencing of remote nodes if cluster nodes fenced is approaching a 
+		# quorum limit. right now we only allow a single cluster node to be fenced
+		if [ $node_type -eq 1 ] || [ $cluster_nodes_killed -ne 0 ]; then
 			index=$(( ($RANDOM % $remote_containers) + 1 ))
 			name=${remote_nodeprefix}$index
+			node_type=1
 		else
 			index=$(( ($RANDOM % $containers) + 1 ))
 			name=${cluster_nodeprefix}$index
+			cluster_nodes_killed=$(( $cluster_nodes_killed + 1 ))
 		fi
 		# make sure this isn't a node that we've already killed
 		echo "$NODE_KILL_LIST" | grep -e "$name"
