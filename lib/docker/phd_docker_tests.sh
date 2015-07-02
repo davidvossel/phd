@@ -136,6 +136,47 @@ baremetal_set_env()
 	done
 }
 
+NODE_KILL_LIST=""
+NODE_KILL_NEW_RSC_COUNT=0
+kill_random_nodes() {
+	local num=$1
+	local name
+	local index
+
+	NODE_KILL_NEW_RSC_COUNT=$2
+	NODE_KILL_LIST=""
+
+	while [ $num -gt 0 ]; do
+		local node_type=$(( ($RANDOM % 2) + 1 ))
+
+		if [ $node_type -eq 1 ]; then
+			index=$(( ($RANDOM % $remote_containers) + 1 ))
+			name=${remote_nodeprefix}$index
+		else
+			index=$(( ($RANDOM % $containers) + 1 ))
+			name=${cluster_nodeprefix}$index
+		fi
+		# make sure this isn't a node that we've already killed
+		echo "$NODE_KILL_LIST" | grep -e "$name"
+		if [ $? -eq 0 ]; then
+			# try again, already killed this one
+			continue
+		fi
+
+		echo "killing node $name" 
+		NODE_KILL_LIST="$NODE_KILL_LIST $name"
+		num=$(( $num - 1))
+		if [ $node_type -eq 1 ]; then
+			# less connection resources will be around
+			NODE_KILL_NEW_RSC_COUNT=$(( NODE_KILL_NEW_RSC_COUNT - 1 ))
+		fi
+		# less cloned resources will be around
+		NODE_KILL_NEW_RSC_COUNT=$(( NODE_KILL_NEW_RSC_COUNT - $cloned_fake_rsc_count ))
+		docker kill $name
+	done
+
+}
+
 launch_baremetal_remote_tests()
 {
 	local total_rsc
@@ -149,33 +190,26 @@ launch_baremetal_remote_tests()
 
 	for (( c=1; c <= $iter; c++ ))
 	do
-		local node_type=$(( ($RANDOM % 2) + 1 ))
-		local name
-		local index
-		echo "============== ITERATION NUMBER $c OUT OF $iter ==============="
-		if [ $node_type -eq 1 ]; then
-			index=$(( ($RANDOM % $remote_containers) + 1 ))
-			name=${remote_nodeprefix}$index
-			total_rsc=$((total_rsc - 1))
-		else
-			index=$(( ($RANDOM % $containers) + 1 ))
-			name=${cluster_nodeprefix}$index
-		fi
-		echo "killing node $name"
+		local num_kill_nodes=1
 
-		docker kill $name
-		baremetal_verify_state "$(( $total_rsc - $cloned_fake_rsc_count ))" 1 $name
+		echo "============== ITERATION NUMBER $c OUT OF $iter ==============="
+		kill_random_nodes $num_kill_nodes $total_rsc
+		baremetal_verify_state "$NODE_KILL_NEW_RSC_COUNT" $num_kill_nodes "$NODE_KILL_LIST"
 		rm -f /var/run/fence_docker_daemon.count
 		sleep 5
-		echo "bring node $name back online"
-		if [ $node_type -eq 1 ]; then
-			launch_pcmk_remote $index
-			total_rsc=$((total_rsc + 1))
-			# clear the failcount on the remote node
-			exec_cmd "crm_resource -C -r $name" "${cluster_nodeprefix}1"
-		else
-			launch_pcmk $index
-		fi
+		echo "bring nodes [$NODE_KILL_LIST] back online"
+
+		for node in $(echo $NODE_KILL_LIST); do
+			# TODO this cleanup should go away after i do the reconnect interval stufff
+			echo "$node" | grep "remote" > /dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				launch_pcmk_remote_full "$node"
+				# clear the failcount on the remote node
+				exec_cmd "crm_resource -C -r $node" "${cluster_nodeprefix}1"
+			else
+				launch_pcmk_full $node
+			fi
+		done
 		baremetal_verify_state $total_rsc 0
 	done
 }

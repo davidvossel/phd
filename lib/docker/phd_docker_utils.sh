@@ -340,13 +340,20 @@ END
 	echo "this is a pretty insecure key" > $helper_dir/authkey
 }
 
+launch_pcmk_full()
+{
+
+	verify_connection "$1"
+	exec_cmd "pcmk_start" "$1"
+
+}
+
 launch_pcmk()
 {
 	local index=$1
 	local name="${cluster_nodeprefix}${index}"
 
-	verify_connection "$name"
-	exec_cmd "pcmk_start" "$name"
+	launch_pcmk_full $name
 }
 
 launch_pcmk_all()
@@ -357,13 +364,18 @@ launch_pcmk_all()
 	done
 }
 
+launch_pcmk_remote_full()
+{
+	verify_connection "$1"
+	exec_cmd "pcmk_remote_start" "$1"
+}
+
 launch_pcmk_remote()
 {
 	local index=$1
 	local name="${remote_nodeprefix}${index}"
 
-	verify_connection "$name"
-	exec_cmd "pcmk_remote_start" "$name"
+	launch_pcmk_remote_full $name
 }
 
 launch_pcmk_remote_all()
