@@ -142,13 +142,15 @@ baremetal_set_env()
 }
 
 NODE_KILL_LIST=""
+NODE_KILL_COUNT=0
 NODE_KILL_NEW_RSC_COUNT=0
 kill_random_nodes() {
-	local num=$1
+	local num=$(( ($RANDOM % $1) + 1 ))
 	local name
 	local index
 	local cluster_nodes_killed=0
 
+	NODE_KILL_COUNT=0
 	NODE_KILL_NEW_RSC_COUNT=$2
 	NODE_KILL_LIST=""
 
@@ -182,6 +184,7 @@ kill_random_nodes() {
 		fi
 		# less cloned resources will be around
 		NODE_KILL_NEW_RSC_COUNT=$(( NODE_KILL_NEW_RSC_COUNT - $cloned_fake_rsc_count ))
+		NODE_KILL_COUNT=$(( NODE_KILL_COUNT + 1 ))
 		docker kill $name
 	done
 
@@ -200,11 +203,11 @@ launch_baremetal_remote_tests()
 
 	for (( c=1; c <= $iter; c++ ))
 	do
-		local num_kill_nodes=2
+		local max_num_kill_nodes=3
 
 		echo "============== ITERATION NUMBER $c OUT OF $iter ==============="
-		kill_random_nodes $num_kill_nodes $total_rsc
-		baremetal_verify_state "$NODE_KILL_NEW_RSC_COUNT" $num_kill_nodes "$NODE_KILL_LIST"
+		kill_random_nodes $max_num_kill_nodes $total_rsc
+		baremetal_verify_state "$NODE_KILL_NEW_RSC_COUNT" "$NODE_KILL_COUNT" "$NODE_KILL_LIST"
 		rm -f /var/run/fence_docker_daemon.count
 		sleep 5
 		echo "bring nodes [$NODE_KILL_LIST] back online"
