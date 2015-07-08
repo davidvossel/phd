@@ -488,12 +488,12 @@ integrate_remote_containers()
 
 	launch_helper_daemons
 	exec_cmd "pcs stonith create shooter fence_docker_cts" "$cluster_node"
-	exec_cmd "pcs property set cluster-recheck-interval=45s" "$cluster_node"
+	exec_cmd "pcs property set cluster-recheck-interval=30s" "$cluster_node"
 
 	for (( c=1; c <= $remote_containers; c++ ))
 	do
 		name="${remote_nodeprefix}${c}"
-		exec_cmd "pcs resource create $name remote server=${remoteiprange}${c} reconnect_interval=30s op start timeout=10s" "$cluster_node"
+		exec_cmd "pcs resource create $name remote server=${remoteiprange}${c} reconnect_interval=60s op start timeout=20s" "$cluster_node"
 		echo "integrating remote node $name"
 
 	done
