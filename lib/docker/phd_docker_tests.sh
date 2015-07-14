@@ -3,7 +3,7 @@
 .  ${PHD_DOCKER_LIB}/phd_docker_utils.sh
 
 fake_rsc_count=0
-cloned_fake_rsc_count=4
+cloned_fake_rsc_count=2
 
 launch_cts()
 {
@@ -116,7 +116,7 @@ baremetal_set_env()
 	local cluster_node="${cluster_nodeprefix}1"
 	local rsc
 
-	fake_rsc_count=$(( $remote_containers * 2 ))
+	fake_rsc_count=$(( $containers * 2 ))
 	rsc=$fake_rsc_count
 
 	for (( c=1; c <= $rsc; c++ ))
@@ -126,6 +126,16 @@ baremetal_set_env()
 			echo "failed to create resources for baremetal remote node tests"
 			exit 1
 		fi
+
+		for (( j=1; j <= $containers; j++ ))
+		do
+			exec_cmd "pcs constraint location add FAKE${c}-${cluster_nodeprefix}${j} FAKE${c} ${cluster_nodeprefix}${j} 0 resource-discovery=exclusive" "$cluster_node"
+			if [ $? -ne 0 ]; then
+				echo "failed to create constraints for baremetal remote node tests"
+				exit 1
+			fi
+		done
+
 	done
 
 	for (( c=1; c <= $cloned_fake_rsc_count; c++ ))
@@ -133,7 +143,7 @@ baremetal_set_env()
 		# increment rsc count by the number of cloned resource instances we'd expect.
 		# each clone is like adding cluster nodes + remote nodes to the total rsc count.
 		fake_rsc_count=$(( $remote_containers + $containers + $fake_rsc_count ))
-		exec_cmd "pcs resource create FAKECLONE${c} Dummy --clone notify=true" "$cluster_node"
+		exec_cmd "pcs resource create FAKECLONE${c} Dummy --clone" "$cluster_node"
 		if [ $? -ne 0 ]; then
 			echo "failed to create resources for baremetal remote node tests"
 			exit 1
