@@ -61,7 +61,7 @@ baremetal_verify_state()
 			continue
 		fi
 
-		fencing_count="$(cat /var/run/fence_docker_daemon.count)"
+		fencing_count="$(cat /var/run/fence_docker_daemon.count 2>/dev/null)"
 		if [ -n "$fencing_count" ] && [ "$expected_fencing_actions" = "0" ]; then
 			echo "WARNING: whoa, someone got fenced when expected fence actions is 0"
 		fi
@@ -99,7 +99,7 @@ baremetal_verify_state()
 			continue
 		fi
 
-		fencing_count="$(cat /var/run/fence_docker_daemon.count)"
+		fencing_count="$(cat /var/run/fence_docker_daemon.count 2>/dev/null)"
 		if [ -z "$fencing_count" ] && [ "$expected_fencing_actions" = "0" ]; then
 			: fall through
 		elif ! [ "$fencing_count" = "$expected_fencing_actions" ]; then
@@ -218,7 +218,7 @@ launch_baremetal_remote_tests()
 		echo "============== ITERATION NUMBER $c OUT OF $iter ==============="
 		kill_random_nodes $max_num_kill_nodes $total_rsc
 		baremetal_verify_state "$NODE_KILL_NEW_RSC_COUNT" "$NODE_KILL_COUNT" "$NODE_KILL_LIST"
-		rm -f /var/run/fence_docker_daemon.count
+		rm -f /var/run/fence_docker_daemon.count > /dev/null 2>&1
 		sleep 5
 		echo "bring nodes [$NODE_KILL_LIST] back online"
 
