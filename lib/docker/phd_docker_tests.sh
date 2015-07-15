@@ -64,6 +64,7 @@ baremetal_verify_state()
 		fencing_count="$(cat /var/run/fence_docker_daemon.count 2>/dev/null)"
 		if [ -n "$fencing_count" ] && [ "$expected_fencing_actions" = "0" ]; then
 			echo "WARNING: whoa, someone got fenced when expected fence actions is 0"
+			exit 1
 		fi
 
 		for node in $(echo $offline); do
