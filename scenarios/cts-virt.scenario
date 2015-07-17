@@ -49,9 +49,12 @@ exit 0
 ##
 target=all
 ....
-mkdir -p /etc/pacemaker
-rm -f /etc/pacemaker/authkey
-echo "this is a pretty insecure key, but at least it is predictable" > /etc/pacemaker/authkey
+wget https://raw.githubusercontent.com/davidvossel/phd/master/tools/fence_phd_kvm
+chmod 755 fence_phd_kvm
+mv fence_phd_kvm /usr/sbin
+
+echo "Checking to make sure fence_xvm is reachable"
+fence_phd_kvm -o list
 ....
 
 ##
@@ -67,5 +70,5 @@ fi
 
 rm -f /var/log/cts.log
 
-/usr/share/pacemaker/tests/cts/CTSlab.py --outputfile /var/log/cts.log --nodes "$PHD_ENV_nodes" -r --stonith "phd" -c --test-ip-base "$PHD_ENV_floating_ips1" --stack "$stack" --at-boot 0 100
+/usr/share/pacemaker/tests/cts/CTSlab.py --outputfile /var/log/cts.log --nodes "$PHD_ENV_nodes" -r --stonith "phd" -c --test-ip-base "$PHD_ENV_floating_ips1" --stack "$stack" --at-boot 0 500
 ....
