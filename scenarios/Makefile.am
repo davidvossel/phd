@@ -23,6 +23,7 @@ phd_scenarios_SCRIPTS = apache-shared-lvm.scenario \
 	iSCSILogicalUnit.scenario	\
 	iSCSILogicalUnit-targetcli.scenario	\
 	iSCSITarget-targetcli.scenario		\
+	kubernetes-basic.scenario	\
 	mariadb-basic.scenario	\
 	nagios-basic.scenario	\
 	nfs-active-active.scenario	\

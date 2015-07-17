@@ -1,0 +1,72 @@
+
+#################################
+# Scenario Requirements Section #
+#################################
+= REQUIREMENTS =
+nodes=3
+floating_ips=1
+packages=pacemaker kubernetes-master etcd pcs
+cluster_init=1
+
+
+######################
+# Deployment Scripts #
+######################
+= SCRIPTS =
+
+##
+# initialize etcd cluster
+##
+target=all
+....
+INITIAL_CLUSTER="etcd_${PHD_ENV_nodes1}=http://${PHD_ENV_nodes1}:2380,etcd_${PHD_ENV_nodes2}=http://${PHD_ENV_nodes2}:2380,etcd_${PHD_ENV_nodes3}=http://${PHD_ENV_nodes3}:2380"
+name=$HOSTNAME
+
+sed -i -e "s#.*ETCD_NAME=.*#ETCD_NAME=etcd_${name}#" \
+       -e "s#.*ETCD_INITIAL_ADVERTISE_PEER_URLS=.*#ETCD_INITIAL_ADVERTISE_PEER_URLS=http://${name}:2380#" \
+       -e "s#.*ETCD_LISTEN_PEER_URLS=.*#ETCD_LISTEN_PEER_URLS=http://${name}:2380#" \
+       -e "s#.*ETCD_LISTEN_CLIENT_URLS=.*#ETCD_LISTEN_CLIENT_URLS=http://${name}:2379,http://127.0.0.1:2379,http://127.0.0.1:4001#" \
+       -e "s#.*ETCD_ADVERTISE_CLIENT_URLS=.*#ETCD_ADVERTISE_CLIENT_URLS=http://${name}:2379#" \
+       -e "s#.*ETCD_INITIAL_CLUSTER=.*#ETCD_INITIAL_CLUSTER=$INITIAL_CLUSTER#" \
+       /etc/etcd/etcd.conf
+....
+
+target=$PHD_ENV_nodes1
+....
+pcs resource create etcd systemd:etcd --clone meta ordered=true
+phd_rsc_verify_start_all 160
+etcdctl cluster-health
+....
+
+
+##
+# configure Kubernetes master services
+##
+target=all
+....
+echo "KUBE_API_ADDRESS=--address=0.0.0.0" >> /etc/kubernetes/apiserver
+....
+##TODO talk to kube guys about etcd being a part of pacemaker since kube expects local connection to db.
+
+target=$PHD_ENV_nodes1
+....
+pcs resource create virtual-ip IPaddr2 ip=$PHD_ENV_floating_ips1 --group master
+pcs resource create apiserver systemd:kube-apiserver --group master
+pcs resource create scheduler systemd:kube-scheduler --group master
+pcs resource create controller systemd:kube-controller-manager --group master
+phd_rsc_verify_start_all 160
+....
+
+
+
+
+
+
+
+
+
+
+
+
+
+
