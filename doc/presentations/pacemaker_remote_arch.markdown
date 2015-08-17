@@ -76,7 +76,7 @@ The reconnection interval feature exists to reattempting recovery of a baremetal
 
 Before starting a resource for the first time, Pacemaker performs resource discovery to determine whether or not that resource is already active within the cluster. This allows Pacemaker to be certain a unique resource is not running in multiple locations at the same time. In the past, there was only a small performance penalty caused by resource discovery. However, once remote nodes entered into the scene this penalty became exponentially more expensive.
 
-## The Math
+## Performance Impact on Baremetal Remote at scale.
 
 To illustrate the performance issue, lets compare a traditional 3 node pacemaker against a more advanced 100 node cluster with using pacemaker_remote.
 
@@ -106,3 +106,9 @@ One common use case we are seeing is a small set of unique control plane resourc
 For example, Red Hat's OpenStack HA Architecture uses 3 nodes to manage around 60 or so OpenStack control plane services, and uses 100s of pacemaker remote nodes to manage cloned compute services. Because of the way this deployment is designed, it is impossible for the control plane to be active on a compute node, so there is no reason for Pacemaker to probe for control plane resources on a compute node.
 
 In order to restrict what nodes pacemaker will probe a resource on, we created the resource-discovery option. 60 resources probed across 3 nodes results in 360 probe actions which is much better than the 6000 probe actions that would occur if the 60 resources were probed on the remote nodes as well.
+
+## Guest Remote Node Resource Discovery
+
+Right now, resource discovery is disabled entirely for guest remote nodes. There is an assumption happening here. Since pacemaker is controlling the actual guest resource (VM/container) we are assuming that the guest resource is configured in a way where unique cluster resources do not start automatically at bootup. 
+
+We have some reservations on whether or not this assumption is entirely safe. At the moment there is a technical limitation that makes it difficult for us to perform resource-discovery on guest remote nodes. Until the "ordered probes" feature is introduced into the policy engine, probing into guest nodes will be a difficult task.
