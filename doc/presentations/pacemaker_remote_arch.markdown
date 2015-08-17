@@ -46,13 +46,23 @@ NOTE: This is the trickiest part of all of this.
 - The start/stop/monitor actions for a remote connection resource are executed on the local (IPC) lrm_state_t object. These actions are then routed directly to the crmd/remote_lrmd_ra.c file which holds all the actual logic for the ocf:pacemaker:remote resource agent.
 - Actions being executed on the remote connection are executed using the remote's lrm_state_t object and have NOTHING to do with crmd/remote_lrmd_ra.c file.
 
-# Fencing Baremetal Remote Nodes
+
+# Fencing
+Fencing is a critical part in what makes remote nodes safe and reliable.
+
+## Fencing Baremetal Remote Nodes
 
 One simple rule.
 
 If a baremetal remote node connection is ever unexpectedly severed (lost), then the remote node is fenced.
 
 There's only one exception to this rule. If the cluster node a remote connection lives on is lost, the cluster will attempt to re-establish a connection to the remote node on another cluster node. If that reconnection fails, then the remote node will be fenced. If that reconnection succeeds, then all the state on the remote node must be redetected because the connection was severed for a period of time. This ensures no resource failures are left undetected.
+
+## Fencing Guest Remote Nodes
+
+Guest remote nodes are fenced differently than baremetal remote nodes. Since pacemaker has control of the resource (vm/container) that pacemaker_remote is running within, fencing is as simple as stopping the guest resource (killing the vm/container). This is achieved by forcing the guest resource to recover if the pacemaker_remote connection resource associated with the guest fails.
+
+So, for guest remote nodes, fencing is implied after the guest resource's "stop" action is executed. If the "stop" action fails, fencing is escallated to fencing the cluster node the guest resource lives on with an actual fencing device. In practice, if this escallation ever occurs, then the guest's resource agent has something wrong with it.
 
 # Migrating Remote Node Connection Resources
 
@@ -62,4 +72,6 @@ By default, baremetal remote node connection resources can freely float between 
 
 The reconnection interval feature exists to reattempting recovery of a baremetal remote node after the remote node is fenced. After a remote node is fenced, pacemaker will wait the duration of the reconnection interval before attempting to reconnect to the remote node. This allows the remote node to have time to come back online (when possible). If the reconnection attempt fails, pacemaker will keep trying to reconnect to the remote node at the specified interval. This feature is basically 'failure-timeout' with some other special logic specific to remote nodes baked in.
 
+# Resource Discovery
 
+TODO
