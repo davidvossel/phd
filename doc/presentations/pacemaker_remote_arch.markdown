@@ -72,6 +72,37 @@ By default, baremetal remote node connection resources can freely float between 
 
 The reconnection interval feature exists to reattempting recovery of a baremetal remote node after the remote node is fenced. After a remote node is fenced, pacemaker will wait the duration of the reconnection interval before attempting to reconnect to the remote node. This allows the remote node to have time to come back online (when possible). If the reconnection attempt fails, pacemaker will keep trying to reconnect to the remote node at the specified interval. This feature is basically 'failure-timeout' with some other special logic specific to remote nodes baked in.
 
-# Resource Discovery
+# Resource Discovery (Probes)
 
-TODO
+Before starting a resource for the first time, Pacemaker performs resource discovery to determine whether or not that resource is already active within the cluster. This allows Pacemaker to be certain a unique resource is not running in multiple locations at the same time. In the past, there was only a small performance penalty caused by resource discovery. However, once remote nodes entered into the scene this penalty became exponentially more expensive.
+
+## The Math
+
+To illustrate the performance issue, lets compare a traditional 3 node pacemaker against a more advanced 100 node cluster with using pacemaker_remote.
+
+(number of nodes) * (unique resources) = (number of probe actions)
+
+If the 3 node cluster has 30 resources being managed this results in a mere 90 probe actions. No big deal. However, for the 100 node cluster this results in 3000 probe actions. To complicate the issue even more, the 100 node cluster likely has way more than 30 resources it manages. If that number grew to something like 5 resources per a node, the 100 node cluster could be required to execute as many as 50,000 probe actions... This would take a really really long time.
+
+so.
+
+5 resources per node (15 total resources) for 3 node cluster = 90 probes
+5 resource per node (500 total resources) for 100 node cluster = 50,000 probes
+
+If each probe took 1 second, the 50,000 probes would take over 13 hours to complete. That's horrible. Luckily we know how to fix all of this.
+
+## Mitigating poor performance
+
+### Use Cloned Resources.
+
+Typically when pacemaker remote is being used to horizontally scale an application, most of the remote nodes are running the exact same resources. By using cloned resources to achieve this, probe actions are drastically reduced.
+
+For example, 5 cloned resources replicated across 100 nodes results in only 500 probe actions. 5 unique resources per a node in a 100 node cluster results in 50,000 probes. Both of these clusters are running the same number of resources (5 resources * 100 nodes = 500 total resources), but by using cloned resources we can exponentially reduce the performance impact of resource discovery.
+
+### Use resouce-discovery=exclusive|never
+
+One common use case we are seeing is a small set of unique control plane resources mixed in with much larger set of cloned resources that are spread across hundreds of remote nodes.
+
+For example, Red Hat's OpenStack HA Architecture uses 3 nodes to manage around 60 or so OpenStack control plane services, and uses 100s of pacemaker remote nodes to manage cloned compute services. Because of the way this deployment is designed, it is impossible for the control plane to be active on a compute node, so there is no reason for Pacemaker to probe for control plane resources on a compute node.
+
+In order to restrict what nodes pacemaker will probe a resource on, we created the resource-discovery option. 60 resources probed across 3 nodes results in 360 probe actions which is much better than the 6000 probe actions that would occur if the 60 resources were probed on the remote nodes as well.
