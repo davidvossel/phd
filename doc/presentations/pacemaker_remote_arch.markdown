@@ -112,3 +112,46 @@ In order to restrict what nodes pacemaker will probe a resource on, we created t
 Right now, resource discovery is disabled entirely for guest remote nodes. There is an assumption happening here. Since pacemaker is controlling the actual guest resource (VM/container) we are assuming that the guest resource is configured in a way where unique cluster resources do not start automatically at bootup. 
 
 We have some reservations on whether or not this assumption is entirely safe. At the moment there is a technical limitation that makes it difficult for us to perform resource-discovery on guest remote nodes. Until the "ordered probes" feature is introduced into the policy engine, probing into guest nodes will be a difficult task.
+
+# Resource Isolation... (NOT REMOTE NODES!!!)
+
+In pacemaker 1.1.13 we introduced a yet to be documented feature called resource isolation. This feature happens to make use of the lrmd/pcmk_remote in some interesting ways, but understand this feature has NOTHING to do with remote nodes. 
+
+Below are the 2 use cases for this feature.
+
+## Use case: HA containers. blackbox.
+This use case is really straight forward. The ocf:heartbeat:docker agent manages containers as blackbox.
+
+Pacemaker launches containers as blackbox resources. Pacemaker doesn’t know what’s in the container, pacemaker just knows it needs to start a container using a specific image and set of run commands. pacemaker monitors container by making sure container is up and optionally calling a custom monitor script within the container to report success.
+
+EXAMPLE:
+https://github.com/davidvossel/phd/blob/master/scenarios/docker-apache-ap.scenario#L96
+
+## Use case: HA containers. whitebox
+
+Pacemaker executes resources in a dynamically created contained environment. 
+
+In this use case, resources are defined in the exact same way that always have been. Resource isolation takes place when a special attribute is set that corresponds to a isolation wrapper script. When pacemaker sees one of these special attributes are set pacemaker knows to route the execution of the resource through a isolation wrapper.
+
+Isolation wrappers are meant to be a generic concept, but at the moment the only one that exists is for docker. This script can be found in the extras/resources/docker-wrapper file in the pacemaker source tree.
+
+To use the docker-wrapper script to dynamically launch a resource in a docker container, all someone needs to do is specify the 'pcmk_docker_image' attribute during the resource definition.
+
+EXAMPLE: Launch Dummy resource in a container.
+In this example we define a Dummy resource which is dynamically launched in a docker container using the specified image. Pacemaker and pacemaker remote must be installed in the container for this to work because the wrapper script is using the lrmd or pacemaker_remote as pid 1 of the container.
+pcs resource create single Dummy pcmk_docker_image=centos:myimage
+
+
+To view more examples of how to use isolation wrappers take a look at the examples in this scenario file.
+https://github.com/davidvossel/phd/blob/master/scenarios/docker-isolation-basic.scenario
+
+There are quite a bit of interesting uses of resource isolation. Since the lrmd/pacemaker_remote is used as pid 1, we have the ability to launch a group of resources within a single dynamically created environment.
+
+Example: launch multiple resources in a single isolated environment.
+https://github.com/davidvossel/phd/blob/master/scenarios/docker-isolation-basic.scenario#L93
+
+## Privileged whitebox containers.
+
+By default, the docker isolation wrapper works in unprivileged mode. This means that resources within the dynamic environment do not have access to the cluster. Agents that rely on at (cib,attrd,ect...) will not work properly in unprivileged mode.
+
+In order to allow these agents to work, the docker wrapper has the 'pcmk_docker_privileged' option which lets us toggle on and off privileged mode. With privileged mode enabled, the docker-wrapper script will launch pacemaker_remote as pid 1 of the container instead of the lrmd. With pacemaker_remote, we can give the scripts within the container access to the cluster via IPC proxy (the same feature that lets remote nodes talk back to the cluster). Notice that remote nodes are still not in use here, we're just utilizing some features that were developed for remote nodes in a different way.
