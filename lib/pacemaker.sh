@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2013 David Vossel <dvossel@redhat.com>
+# Copyright (c) 2013 David Vossel <davidvossel@gmail.com>
 #					All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify

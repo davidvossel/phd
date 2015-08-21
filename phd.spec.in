@@ -64,5 +64,5 @@ rm -rf $RPM_BUILD_ROOT
 %{_sysconfdir}/phd/*
 
 %changelog
-* Wed Dec 11 2013 David Vossel <dvossel@redhat.com> - 0.1.0-1
+* Wed Dec 11 2013 David Vossel <davidvossel@gmail.com> - 0.1.0-1
 - Initial make rpm support
