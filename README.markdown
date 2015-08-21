@@ -12,13 +12,6 @@ An example cluster_definition file can be found in /etc/phd/cluster_definition.c
 
 Run 'phd_exec -h' see usage.
 
-## TEST REPO
-
-I've made the repo I use for testing phd available.  The phd project has successfully been used in both fedora 20 and rhel6 based environments.
-
-* wget -O /etc/yum.repos.d/vossel.repo http://davidvossel.com/repo/vossel-test.repo
-* yum install phd
-
 ## SETUP
 
 Before phd can be used, you must be able to either ssh into all the nodes in the cluster without requiring passwords (using ssh keys) or have qarshd enabled. Qarshd is a quality assurance tool that should never be used in a production environment.
